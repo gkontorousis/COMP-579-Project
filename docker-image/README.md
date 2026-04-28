@@ -8,6 +8,7 @@ It is based on your diagnostics:
 - Host driver: 550.90.07 (CUDA 12.4 capability shown by `nvidia-smi`)
 
 The previous container had a TensorFlow/CUDA/cuDNN mismatch (`tensorflow==2.19.0` but runtime libs were not aligned), which caused `GPUs: []`.
+This image uses `tensorflow/tensorflow:2.16.1-gpu`, which is a better match for CUDA 12.3/cuDNN 8 user-space libraries on the FPT GPU hosts.
 
 ## Files
 
@@ -25,7 +26,7 @@ From repository root:
 cd docker-image
 docker build \
   --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/id_ed25519.pub)" \
-  -t comp579-tf-gpu:2.18.0 \
+  -t comp579-tf-gpu:2.16.1 \
   .
 ```
 

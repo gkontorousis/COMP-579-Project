@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.18.0-gpu
+FROM tensorflow/tensorflow:2.16.1-gpu
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
