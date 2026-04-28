@@ -12,6 +12,7 @@ The previous container had a TensorFlow/CUDA/cuDNN mismatch (`tensorflow==2.19.0
 ## Files
 
 - `Dockerfile`: custom TensorFlow GPU image
+- `Dockerfile.debug`: debug image that prints startup diagnostics and stays alive if `sshd` fails
 - `run_tensorflow_container.sh`: convenience runner (starts SSH container)
 - `workspace_ssh_sync.sh`: helper for syncing SSH keys from `/workspace/.ssh`
 - `sshd_entrypoint.sh`: configures user key auth and starts `sshd`
@@ -21,10 +22,25 @@ The previous container had a TensorFlow/CUDA/cuDNN mismatch (`tensorflow==2.19.0
 From repository root:
 
 ```bash
+cd docker-image
 docker build \
   --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/id_ed25519.pub)" \
-  -t comp579-tf-gpu:2.17.1 \
-  -f docker-image/Dockerfile \
+  -t comp579-tf-gpu:2.18.0 \
+  .
+```
+
+## Build Debug Tag
+
+Use this when the platform fails before showing useful logs. The debug image prints startup diagnostics, attempts `nvidia-smi` and TensorFlow GPU detection, starts `sshd`, and keeps the container alive if `sshd` exits.
+
+```bash
+cd docker-image
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg SSH_PUBLIC_KEY="$(cat ~/.ssh/fpt_ai.pub)" \
+  -t <dockerhub-user>/<repo>:debug \
+  -f Dockerfile.debug \
+  --push \
   .
 ```
 
