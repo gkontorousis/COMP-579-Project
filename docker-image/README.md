@@ -9,6 +9,9 @@ It is based on your diagnostics:
 
 The previous container had a TensorFlow/CUDA/cuDNN mismatch (`tensorflow==2.19.0` but runtime libs were not aligned), which caused `GPUs: []`.
 This image uses `tensorflow/tensorflow:2.16.1-gpu`, which is a better match for CUDA 12.3/cuDNN 8 user-space libraries on the FPT GPU hosts.
+It pre-installs the AI4Finance system prerequisites at image build time (for example `cmake`, `libopenmpi-dev`, `python3-dev`, and `zlib1g-dev`).
+Python project dependencies are installed in a venv by running `setup_project_venv.sh` (note: script is in PATH).
+Note: the upstream AI4Finance README mentions `tensorflow==1.14`, but this image intentionally stays on TensorFlow 2.16.1 for GPU/runtime compatibility with your target platform.
 
 ## Files
 
@@ -17,6 +20,7 @@ This image uses `tensorflow/tensorflow:2.16.1-gpu`, which is a better match for 
 - `run_tensorflow_container.sh`: convenience runner (starts SSH container)
 - `workspace_ssh_sync.sh`: helper for syncing SSH keys from `/workspace/.ssh`
 - `sshd_entrypoint.sh`: configures user key auth and starts `sshd`
+- `setup_project_venv.sh`: manual helper to create project venv and install Python deps
 
 ## Build
 
@@ -55,6 +59,14 @@ Public key options:
 ```bash
 bash docker-image/run_tensorflow_container.sh
 ```
+
+On first container start, a helper script is copied into persistent storage (if missing):
+
+```bash
+setup_project_venv.sh
+```
+
+Run it manually when you are ready to create your venv.
 
 By default, it maps host port `2222` to container port `22`.
 

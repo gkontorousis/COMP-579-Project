@@ -9,6 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
+    cmake \
+    libopenmpi-dev \
+    python3-dev \
+    zlib1g-dev \
+    swig \
+    ffmpeg \
     openssh-client \
     openssh-server \
     tmux \
@@ -20,7 +26,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY workspace_ssh_sync.sh /usr/local/bin/workspace_ssh_sync.sh
 COPY update_bash_prompt.sh /usr/local/bin/update_bash_prompt.sh
 COPY sshd_debug_entrypoint.sh /usr/local/bin/sshd_debug_entrypoint.sh
-RUN chmod +x /usr/local/bin/workspace_ssh_sync.sh /usr/local/bin/update_bash_prompt.sh /usr/local/bin/sshd_debug_entrypoint.sh && \
+COPY setup_project_venv.sh /usr/local/share/comp579/setup_project_venv.sh
+RUN chmod +x /usr/local/bin/workspace_ssh_sync.sh /usr/local/bin/update_bash_prompt.sh /usr/local/bin/sshd_debug_entrypoint.sh /usr/local/share/comp579/setup_project_venv.sh && \
     TARGET_HOME=/root /usr/local/bin/update_bash_prompt.sh && \
     TARGET_HOME=/etc/skel /usr/local/bin/update_bash_prompt.sh && \
     mkdir -p /root/.ssh && chmod 700 /root/.ssh && \

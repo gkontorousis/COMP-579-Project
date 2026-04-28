@@ -43,6 +43,12 @@ chmod 700 "${SSH_DIR}" 2>/dev/null || true
 touch "${AUTH_KEYS_FILE}" 2>/dev/null || true
 chmod 600 "${AUTH_KEYS_FILE}" 2>/dev/null || true
 
+# Seed a manual setup helper into persistent storage if missing.
+if [[ -d /workspace && ! -f /workspace/setup_project_venv.sh ]]; then
+  cp /usr/local/share/comp579/setup_project_venv.sh /workspace/setup_project_venv.sh || true
+  chmod +x /workspace/setup_project_venv.sh 2>/dev/null || true
+fi
+
 if [[ -f /workspace/.ssh/authorized_keys ]]; then
   echo "Using /workspace/.ssh/authorized_keys"
   cp /workspace/.ssh/authorized_keys "${AUTH_KEYS_FILE}" || true
