@@ -14,11 +14,11 @@ def load_prices(path):
 
 def build_daily_frames(df: pd.DataFrame, mode: str ="train"):
     data_1=df.copy()
-    equal_4711_list = list(data_1.tic.value_counts() == 4711)
+    equal_magic_num_list = list(data_1.tic.value_counts() == TICKER_COUNT_MAGIC_NUM)
     names = data_1.tic.value_counts().index
 
     # select_stocks_list = ['NKE','KO']
-    select_stocks_list = list(names[equal_4711_list])+['NKE','KO']
+    select_stocks_list = list(names[equal_magic_num_list])+['NKE','KO']
 
     data_2 = data_1[data_1.tic.isin(select_stocks_list)][~data_1.datadate.isin(['20010912','20010913'])]
 
