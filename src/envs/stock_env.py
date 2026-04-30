@@ -214,8 +214,8 @@ class StockEnv(gym.Env):
         return [seed]
 
 
-# smoke test to ensure custom environment runs as expected
 def main():
+    # smoke test to ensure custom environment runs as expected
     args_parser = argparse.ArgumentParser(
         "Custom Stock Trading Environment for RL training for Liu paper"
     )
@@ -227,44 +227,86 @@ def main():
         "--mode",
         type=str,
         default="train",
-        choices=["train", "test"],
-        help='environment mode; can be "train" or "test"',
+        choices=["train", "test", "full"],
+        help='environment mode; can be "train", "test", or "full" (runs both)',
         required=False,
     )
     args = args_parser.parse_args()
     data_path = args.dj_30_dp_path
     dji_path = args.dji_path
     mode = args.mode
-    env = StockEnv(
-        data_path=data_path,
-        mode=mode,
-        day=0,
-        init_balance=10_000,
-        max_shares_per_trade=5,
-        dji_path=dji_path,
-    )
+    modes_to_run = ["train", "test"] if mode == "full" else [mode]
+    for run_mode in modes_to_run:
+        env = StockEnv(
+            data_path=data_path,
+            mode=run_mode,
+            day=0,
+            init_balance=10_000,
+            max_shares_per_trade=5,
+            dji_path=dji_path,
+        )
+        if run_mode == "test":
+            assert hasattr(env, "dji_growth")
 
-    obs, info = env.reset(seed=42)
-    assert obs.shape == env.observation_space.shape
-    assert obs.dtype == np.float32
-    assert isinstance(info, dict)
-    max_steps = len(env.daily_data) + 2
-    steps = 0
-    done = False
-    while not done and steps < max_steps:
-        action = env.action_space.sample()
-        obs, reward, terminated, truncated, info = env.step(action)
+        # Reset determinism for same seed.
+        obs_a, info_a = env.reset(seed=42)
+        obs_b, info_b = env.reset(seed=42)
+        assert np.allclose(obs_a, obs_b), f"non-deterministic reset for mode={run_mode}"
+        assert isinstance(info_a, dict) and isinstance(info_b, dict)
+
+        obs = obs_b
         assert obs.shape == env.observation_space.shape
-        assert np.isfinite(reward), f"non-finite reward at step {steps}"
-        assert isinstance(terminated, (bool, np.bool_))
-        assert isinstance(truncated, (bool, np.bool_))
-        assert isinstance(info, dict)
-        done = bool(terminated or truncated)
-        steps += 1
+        assert obs.dtype == np.float32
 
-    # should eventually finish
-    assert done, f"episode did not terminate within {max_steps} steps"
-    print(f"Smoke test passed. steps={steps}, final_reward={reward:.4f}")
+        max_steps = len(env.daily_data) + 2
+        steps = 0
+        done = False
+        reward = 0.0
+        while not done and steps < max_steps:
+            if steps == 0:
+                action = env.action_space.sample()
+            elif steps == 1:
+                action = env.action_space.sample().astype(np.float32) + 0.49
+            elif steps == 2:
+                action = env.action_space.sample().reshape(1, -1)
+            else:
+                action = env.action_space.sample()
+
+            obs, reward, terminated, truncated, info = env.step(action)
+            assert obs.shape == env.observation_space.shape
+            assert obs.dtype == np.float32
+            assert np.all(np.isfinite(obs)), f"non-finite obs at step {steps} mode={run_mode}"
+            assert np.isfinite(reward), f"non-finite reward at step {steps} mode={run_mode}"
+            assert isinstance(terminated, (bool, np.bool_))
+            assert isinstance(truncated, (bool, np.bool_))
+            assert isinstance(info, dict)
+
+            # State invariants: cash and holdings are non-negative.
+            n = env.n_stocks
+            cash = float(obs[0])
+            prices = obs[1 : 1 + n]
+            holdings = obs[1 + n :]
+            assert cash >= 0.0, f"negative cash at step {steps} mode={run_mode}"
+            assert np.all(holdings >= 0.0), f"negative holdings at step {steps} mode={run_mode}"
+            assert np.all(np.isclose(holdings, np.round(holdings))), (
+                f"non-integer holdings at step {steps} mode={run_mode}"
+            )
+
+            # Portfolio value from state should match latest recorded asset value.
+            portfolio_value = float(
+                cash + np.dot(prices.astype(np.float64), holdings.astype(np.float64))
+            )
+            assert np.isclose(env.asset_memory[-1], portfolio_value, atol=1e-5), (
+                f"asset_memory mismatch at step {steps} mode={run_mode}"
+            )
+
+            done = bool(terminated or truncated)
+            steps += 1
+
+        # should eventually finish
+        assert done, f"episode did not terminate within {max_steps} steps for mode={run_mode}"
+        env.close()
+        print(f"Smoke test passed for mode={run_mode}. steps={steps}, final_reward={reward:.4f}")
 
 
 if __name__ == "__main__":
