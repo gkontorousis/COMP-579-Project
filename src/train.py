@@ -7,8 +7,10 @@ import numpy as np
 from src.registration import register_stock_envs
 import gymnasium as gym
 
+# TODO: Implement train logic
 
-def main():
+
+def smoke_test():
     # smoke test for ensuring the integration with SB3 baselines is working with our custom Gymnasium environment (stock_env.py)
     parser = argparse.ArgumentParser("SB3 smoke training for RLStock")
     parser.add_argument("--dj_30_dp_path", type=Path, required=True)
@@ -48,4 +50,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    smoke_test()
