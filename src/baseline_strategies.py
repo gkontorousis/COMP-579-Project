@@ -2,12 +2,31 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from pypfopt import expected_returns, risk_models
 from pypfopt.efficient_frontier import EfficientFrontier
 
 # Annualization / PyPortfolioOpt frequency convention (trading days per year).
 MHR_FREQ = 252
+
+
+def compute_portfolio_metrics(values, freq=MHR_FREQ) -> dict:
+    values = np.asarray(values, dtype=float)
+    n = len(values) - 1
+    initial = float(values[0])
+    final = float(values[-1])
+    ann_return = (final / initial) ** (freq / n) - 1
+    daily_rets = np.diff(values) / values[:-1]
+    ann_std = float(np.std(daily_rets, ddof=1)) * np.sqrt(freq)
+    sharpe = ann_return / ann_std if ann_std > 0 else float("nan")
+    return {
+        "initial_portfolio_value": round(initial, 4),
+        "final_portfolio_value": round(final, 4),
+        "annualized_return": round(ann_return, 6),
+        "annualized_std": round(ann_std, 6),
+        "sharpe_ratio": round(sharpe, 6),
+    }
 
 
 def episode_dates_series(daily_data: list[Any]) -> pd.Series:
