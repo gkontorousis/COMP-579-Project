@@ -1,10 +1,10 @@
-# Gymnasium Environment Re-Implementation Plan (Updated)
+# Gymnasium Environment Re-Implementation Checklist
 
 This plan reflects the current implementation choices while preserving the original paper's environment logic and keeping remaining work items intact.
 
 Paper target:
 
-- Xiong, Z., Liu, X.Y., Zhong, S., Yang, H., and Walid, A. (2018).  
+- Xiong, Z., Liu, X.Y., Zhong, S., Yang, H., and Walid, A. (2018).
   _Practical Deep Reinforcement Learning Approach for Stock Trading_.
 
 ---
@@ -18,6 +18,21 @@ Rebuild the original `rlstock` environment as a clean Gymnasium environment that
 - is compatible with modern RL libraries (e.g., Stable-Baselines3).
 
 This plan intentionally avoids legacy environment injection into `site-packages/gym`.
+
+---
+
+## Progress Checklist
+
+- [X] Port environment to Gymnasium API in `src/stock_env.py`
+- [X] Consolidate data loading/preprocessing in `src/data_loader.py`
+- [X] Register train/test env IDs in `src/registration.py`
+- [X] Add per-module smoke test entrypoints (`main()`)
+- [X] Run smoke checks for train/test env behavior
+- [X] Run SB3 smoke training with DDPG
+- [ ] Add validation split configuration from paper/date protocol
+- [ ] Register validation env (`RLStockValidation-v0`)
+- [ ] Run validation-stage hyperparameter selection
+- [ ] Final reproducibility documentation/artifacts cleanup
 
 ---
 
@@ -52,8 +67,6 @@ COMP-579-Project/
     stock_env.py
     data_loader.py
     registration.py
-  result_training.png
-  result_test.png
   reproduction_plan.md
 ```
 
@@ -99,124 +112,90 @@ Deviation from original draft recommendation:
 
 ---
 
-## 6) Data Pipeline Plan
+## 6) Data Pipeline Checklist
 
 ### Step 6.1: Load raw data
 
-Implemented:
-
-- CSV loading is local-path based through `src/data_loader.py` (`load_prices`).
+- [X] CSV loading is local-path based through `src/data_loader.py` (`load_prices`)
 
 ### Step 6.2: Reproduce preprocessing
 
-Implemented in `build_daily_frames`:
-
-- filter tickers and date windows,
-- compute adjusted prices (`adjcp`),
-- construct per-day slices in chronological order.
+- [X] Filter tickers/date windows
+- [X] Compute adjusted prices (`adjcp`)
+- [X] Build chronological per-day slices
 
 ### Step 6.3: Split by mode
 
-Implemented:
-
-- `mode="train"` and `mode="test"` handled in `build_daily_frames`.
-
-Remaining optional extension (unchanged):
-
-- `validation` split (optional but recommended).
+- [X] `train` split implemented in `build_daily_frames`
+- [X] `test` split implemented in `build_daily_frames`
+- [ ] `validation` split configuration
+  - [ ] Confirm train/validation/trade date ranges from paper + original implementation notes
+  - [ ] Add `mode="validation"` support in `build_daily_frames`
+  - [ ] Add smoke check for validation slice shape/length
 
 ---
 
-## 7) Core Implementation Tasks
+## 7) Core Implementation Checklist
 
 ### Task A: Configuration strategy
 
-Implemented choice:
-
-- No separate `stock_env_config.py`; env is dynamically configured through constructor args (`init_balance`, `max_shares_per_trade`, paths, mode, start day).
-
-Recommended housekeeping:
-
-- keep defaults centralized/documented,
-- treat constructor defaults as frozen experiment config for reproducibility.
+- [X] Dynamic constructor-based configuration (no separate `stock_env_config.py`)
+- [ ] Keep defaults centralized/documented for reproducibility (final README + plan pass)
 
 ### Task B: Data layer
 
-Implemented in `src/data_loader.py`:
-
-- `load_prices(path)`,
-- `build_daily_frames(df, mode)`.
+- [X] `load_prices(path)`
+- [X] `build_daily_frames(df, mode)`
+- [ ] Remove pandas boolean-mask reindex warning in preprocessing
 
 ### Task C: `stock_env.py`
 
-Implemented in `src/envs/stock_env.py`:
-
-- environment state creation,
-- buy/sell execution,
-- reward calculation,
-- tracking `asset_memory`,
-- terminal handling and info dict,
-- DJI benchmark growth calculation for test-mode plotting.
+- [X] Environment state creation
+- [X] Buy/sell execution
+- [X] Reward calculation
+- [X] `asset_memory` tracking
+- [X] Terminal handling + info dict
+- [X] DJI benchmark growth for test-mode plotting
 
 ### Task D: `registration.py`
 
-Implemented in `src/registration.py`:
-
-- registers `RLStockTrain-v0`
-- registers `RLStockTest-v0`
-- checks Gymnasium registry before registering to avoid duplicate-ID errors.
+- [X] Register `RLStockTrain-v0`
+- [X] Register `RLStockTest-v0`
+- [X] Guard against duplicate registration
+- [ ] Add `RLStockValidation-v0` after validation split ranges are finalized
 
 ---
 
-## 8) Validation and Smoke Test Plan
+## 8) Validation and Smoke Test Checklist
 
-Implemented smoke validation:
-
-1. Env runs in both `train` and `test` modes through `src/envs/stock_env.py` `main`.
-2. Random-step execution reaches terminal for both modes.
-3. Runtime checks currently verify:
-   - observation shape/dtype stability,
-   - finite rewards and observations,
-   - cash/holdings invariants,
-   - action input robustness (sampled, float-cast, reshaped),
-   - asset-memory/portfolio-value consistency.
-
-Remaining (non-blocking cleanup):
-
-- remove pandas boolean-mask reindex warning in `src/data_loader.py` preprocessing pipeline.
-
-Before training any RL model (kept as target criteria):
-
-1. Instantiate env and call `reset`.
-2. Step with random actions for 10-20 steps.
-3. Confirm:
-   - observation shape is stable,
-   - reward is finite,
-   - cash/holdings never violate constraints,
-   - episode terminates at expected end date.
+- [X] Env runs in both `train` and `test` modes through `src/stock_env.py` `main`
+- [X] Random-step execution reaches terminal for both modes
+- [X] Runtime checks in smoke flow:
+  - observation shape/dtype stability
+  - finite rewards/observations
+  - cash/holdings invariants
+  - action input robustness
+  - asset-memory/portfolio-value consistency
+- [ ] Validation-mode smoke checks after split is implemented
 
 Testing policy for this project:
 
-- no separate test-suite files,
-- each module should include a `main()` smoke entrypoint for runtime verification,
-- API, reward, and invariant checks should be implemented inside module-level smoke flows.
+- [X] No separate test-suite files
+- [X] Per-module `main()` smoke entrypoints
+- [X] API/reward/invariant checks embedded in smoke flows
 
 ---
 
-## 9) Integration Plan with SB3 (Remaining)
+## 9) Integration with SB3 Checklist
 
-Use this only after Section 8 passes:
-
-- algorithm: DDPG (or TD3/SAC for robustness experiments),
-- policy: `MlpPolicy`,
-- vector wrapper: `DummyVecEnv`,
-- action noise for exploration.
-
-Start with tiny smoke run (`1e3-1e4` timesteps) before any long run.
+- [X] SB3 smoke run completed (`DDPG` + `MlpPolicy` + `DummyVecEnv`)
+- [X] Tiny timesteps smoke training executed successfully
+- [ ] Validation-stage hyperparameter sweep (using validation split once added)
+- [ ] Final train/test protocol run for report-quality results
 
 ---
 
-## 10) Reproducibility Checklist (Remaining)
+## 10) Reproducibility Checklist
 
 - [ ] Fixed random seeds
 - [ ] Data source and split ranges documented
@@ -234,4 +213,3 @@ This environment re-implementation should credit:
 - Original project: [hust512/DQN-DDPG_Stock_Trading](https://github.com/hust512/DQN-DDPG_Stock_Trading)
 - Original paper: arXiv / NeurIPS workshop publication
 - Modern environment API: [Farama Gymnasium](https://gymnasium.farama.org/)
-
