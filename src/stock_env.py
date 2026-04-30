@@ -80,7 +80,7 @@ class StockEnv(gym.Env):
             low=-max_shares_per_trade,
             high=max_shares_per_trade,
             shape=(self.n_stocks,),
-            dtype=np.int8,
+            dtype=np.float32,
         )
 
         # [cash] + [prices] + [holdings]; size is 1 + n_stocks (prices) + n_stocks (holdings)
@@ -124,7 +124,8 @@ class StockEnv(gym.Env):
     def step(self, actions):
         # explicitly convert the actions from any policy using this env to be in integer space
         actions = np.asarray(actions).reshape(self.n_stocks)
-        actions = np.clip(actions, self.action_space.low, self.action_space.high).astype(np.int8)
+        actions = np.clip(actions, self.action_space.low, self.action_space.high)
+        actions = np.rint(actions).astype(np.int8)
 
         terminated = self.day >= self.terminal_day
         truncated = False
