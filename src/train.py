@@ -7,7 +7,17 @@ import numpy as np
 from src.registration import register_stock_envs
 import gymnasium as gym
 
-# TODO: Implement train logic
+def train(algo, env, timesteps, seed, model_out, action_noise):
+    model = algo(
+        "MlpPolicy",
+        env,
+        action_noise=action_noise,
+        verbose=1,
+        seed=seed,
+    )
+    model.learn(total_timesteps=timesteps)
+    model_out.parent.mkdir(parents=True, exist_ok=True)
+    model.save(str(model_out))
 
 
 def smoke_test():
