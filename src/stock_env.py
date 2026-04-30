@@ -1,42 +1,14 @@
 from pathlib import Path
 import argparse
 from src import data_loader
+from src import plots
+from src import baseline_strategies as bstrat
 
 import numpy as np
 import pandas as pd
 import gymnasium as gym
 from gymnasium.utils import seeding
 from gymnasium import spaces
-import matplotlib.pyplot as plt
-
-
-def _compute_dji_account_growth(
-    path, episode_dates, init_balance, date_col="Date", price_col="Adj Close"
-):
-    dji = pd.read_csv(path)
-    dji[date_col] = pd.to_datetime(dji[date_col], errors="coerce")
-    dji = dji.dropna(subset=[date_col, price_col]).sort_values(date_col)
-
-    px = dji.set_index(date_col)[price_col].astype(float)
-
-    # env dates come from datadate YYYYMMDD ints -> datetime
-    ep_dates = pd.to_datetime(episode_dates.astype(str), format="%Y%m%d", errors="coerce")
-    ep_dates = pd.DatetimeIndex(ep_dates)
-
-    aligned_px = px.reindex(ep_dates).ffill().bfill()
-    daily_ret = aligned_px.pct_change().fillna(0.0)
-
-    growth = (1.0 + daily_ret).cumprod() * float(init_balance)
-
-    return growth.to_numpy()
-
-
-def _compute_min_variance_portfolio_growth(
-    path, episode_dates, init_balance, date_col="Date", price_col="Adj Close"
-):
-    # TODO: Implement min variance portfolio computation
-    # use pyportfolioopt to compute the min variance portfolio
-    return 0.0
 
 
 class StockEnv(gym.Env):
@@ -61,14 +33,19 @@ class StockEnv(gym.Env):
         self.max_shares_per_trade = max_shares_per_trade
 
         if self.mode == "test":
-            if self.mode == "test" and dji_path is None:
+            if dji_path is None:
                 raise ValueError("dji_path must be provided when mode='test'.")
 
-            episode_dates = pd.Series([day_df["datadate"].iloc[0] for day_df in self.daily_data])
-            self.dji_growth = _compute_dji_account_growth(
+            episode_dates = bstrat.episode_dates_series(self.daily_data)
+            self.dji_growth = bstrat.compute_dji_account_growth(
                 path=dji_path,
                 episode_dates=episode_dates,
                 init_balance=self.init_balance,
+            )
+            self.min_variance_growth = bstrat.compute_min_variance_portfolio_growth(
+                self.daily_data,
+                episode_dates,
+                self.init_balance,
             )
 
         self.day = day
@@ -139,13 +116,7 @@ class StockEnv(gym.Env):
         truncated = False
 
         if terminated:
-            plt.plot(self.asset_memory, "r", label="agent")
-            if self.mode == "test":
-                plt.plot(self.dji_growth, label="dji_growth")
-
-            plt.legend()
-            plt.savefig("result_test.png" if self.mode == "test" else "result_training.png")
-            plt.close()
+            plots.save_episode_result_figure(self)
 
             total_reward = self._total_portfolio_value() - self.init_balance
             print(f"total_reward: {total_reward}")
@@ -256,6 +227,7 @@ def main():
         )
         if run_mode == "test":
             assert hasattr(env, "dji_growth")
+            assert hasattr(env, "min_variance_growth")
 
         # Reset determinism for same seed.
         obs_a, info_a = env.reset(seed=42)
