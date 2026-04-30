@@ -23,7 +23,7 @@ def register_stock_envs(
     if "RLStockTrain-v0" not in gym.envs.registry:
         register(
             id="RLStockTrain-v0",
-            entry_point="src.envs.stock_env:StockEnv",
+            entry_point="src.stock_env:StockEnv",
             kwargs={
                 "data_path": data_path,
                 "mode": "train",
@@ -36,7 +36,7 @@ def register_stock_envs(
     if "RLStockTest-v0" not in gym.envs.registry:
         register(
             id="RLStockTest-v0",
-            entry_point="src.envs.stock_env:StockEnv",
+            entry_point="src.stock_env:StockEnv",
             kwargs={
                 "data_path": data_path,
                 "mode": "test",

@@ -49,8 +49,7 @@ COMP-579-Project/
     ^DJI.csv
     dow_jones_30_ticker.txt
   src/
-    envs/
-      stock_env.py
+    stock_env.py
     data_loader.py
     registration.py
   result_training.png
