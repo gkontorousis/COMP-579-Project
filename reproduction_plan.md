@@ -1,6 +1,6 @@
-# Gymnasium Environment Re-Implementation Plan
+# Gymnasium Environment Re-Implementation Plan (Updated)
 
-This plan focuses on recreating a **custom stock-trading environment** using **Farama Gymnasium**, while preserving the original paper's environment logic.
+This plan reflects the current implementation choices while preserving the original paper's environment logic and keeping remaining work items intact.
 
 Paper target:
 
@@ -38,12 +38,12 @@ Input datasets:
 
 ---
 
-## 3) Target Project Layout
+## 3) Current Project Layout (Implemented Choices)
 
-Recommended structure:
+Implemented structure in this repo:
 
 ```text
-my_project/
+COMP-579-Project/
   data/
     dow_jones_30_daily_price.csv
     ^DJI.csv
@@ -51,21 +51,18 @@ my_project/
   src/
     envs/
       stock_env.py
-      stock_env_config.py
-    data/
-      loaders.py
-      preprocess.py
-    train/
-      train_smoke.py
-    eval/
-      evaluate.py
+    data_loader.py
     registration.py
-  outputs/
-  tests/
-    test_env_api.py
-    test_reward_logic.py
-  README.md
+  result_training.png
+  result_test.png
+  reproduction_plan.md
 ```
+
+Notes:
+
+- Data loading + preprocessing are consolidated into `src/data_loader.py`.
+- A single configurable env class (`StockEnv`) supports both train/test via constructor args.
+- Registration is handled in `src/registration.py`.
 
 ---
 
@@ -85,19 +82,21 @@ Keep these semantics unchanged before optimization/tuning.
 
 ## 5) Gymnasium API Migration Requirements
 
-Implement environment with Gymnasium API:
+Implemented with Gymnasium API:
 
 - `reset(self, *, seed=None, options=None) -> (obs, info)`
 - `step(self, action) -> (obs, reward, terminated, truncated, info)`
-- use `gymnasium.Env`
-- use explicit `np.float32` observation/action dtypes
+- uses `gymnasium.Env`
+- uses explicit `np.float32` observation dtype
 
-Recommended definitions:
+Current implemented action definition:
 
-- `action_space = spaces.Box(low=-1.0, high=1.0, shape=(N_STOCKS,), dtype=np.float32)`
+- `action_space = spaces.Box(low=-max_shares_per_trade, high=max_shares_per_trade, shape=(N_STOCKS,), dtype=np.int8)`
 - `observation_space = spaces.Box(..., dtype=np.float32)`
 
-Then map normalized action `[-1, 1]` to trade units internally.
+Deviation from original draft recommendation:
+
+- The plan originally proposed normalized float actions `[-1, 1]`; current implementation keeps integer share actions in `[-K, K]` to stay closer to original `rlstock` trade semantics.
 
 ---
 
@@ -105,11 +104,13 @@ Then map normalized action `[-1, 1]` to trade units internally.
 
 ### Step 6.1: Load raw data
 
-- Read CSVs from `my_project/data/` only (no absolute paths).
+Implemented:
+
+- CSV loading is local-path based through `src/data_loader.py` (`load_prices`).
 
 ### Step 6.2: Reproduce preprocessing
 
-Match original logic:
+Implemented in `build_daily_frames`:
 
 - filter tickers and date windows,
 - compute adjusted prices (`adjcp`),
@@ -117,56 +118,75 @@ Match original logic:
 
 ### Step 6.3: Split by mode
 
-Use config-driven ranges:
+Implemented:
 
-- `train`
-- `validation` (optional but recommended)
-- `test`
+- `mode="train"` and `mode="test"` handled in `build_daily_frames`.
+
+Remaining optional extension (unchanged):
+
+- `validation` split (optional but recommended).
 
 ---
 
 ## 7) Core Implementation Tasks
 
-### Task A: `stock_env_config.py`
+### Task A: Configuration strategy
 
-Define reusable config:
+Implemented choice:
 
-- initial cash,
-- max trade size mapping,
-- train/test date boundaries,
-- transaction cost toggle (if added, keep off by default for paper fidelity).
+- No separate `stock_env_config.py`; env is dynamically configured through constructor args (`init_balance`, `max_shares_per_trade`, paths, mode, start day).
 
-### Task B: `loaders.py` and `preprocess.py`
+Recommended housekeeping:
 
-Create deterministic preprocessing functions:
+- keep defaults centralized/documented,
+- treat constructor defaults as frozen experiment config for reproducibility.
+
+### Task B: Data layer
+
+Implemented in `src/data_loader.py`:
 
 - `load_prices(path)`,
-- `build_daily_frames(df, mode, config)`.
+- `build_daily_frames(df, mode)`.
 
 ### Task C: `stock_env.py`
 
-Implement:
+Implemented in `src/envs/stock_env.py`:
 
 - environment state creation,
 - buy/sell execution,
 - reward calculation,
 - tracking `asset_memory`,
-- terminal handling and info dict.
+- terminal handling and info dict,
+- DJI benchmark growth calculation for test-mode plotting.
 
 ### Task D: `registration.py`
 
-Register env IDs such as:
+Implemented in `src/registration.py`:
 
-- `RLStockTrain-v0`
-- `RLStockTest-v0`
-
-using Gymnasium registration utilities.
+- registers `RLStockTrain-v0`
+- registers `RLStockTest-v0`
+- checks Gymnasium registry before registering to avoid duplicate-ID errors.
 
 ---
 
 ## 8) Validation and Smoke Test Plan
 
-Before training any RL model:
+Implemented smoke validation:
+
+1. Env runs in both `train` and `test` modes through `src/envs/stock_env.py` `main`.
+2. Random-step execution reaches terminal for both modes.
+3. Runtime checks currently verify:
+   - observation shape/dtype stability,
+   - finite rewards and observations,
+   - cash/holdings invariants,
+   - action input robustness (sampled, float-cast, reshaped),
+   - asset-memory/portfolio-value consistency.
+
+Remaining (non-blocking cleanup):
+
+- remove pandas boolean-mask reindex warning in `src/data_loader.py` preprocessing pipeline.
+
+Before training any RL model (kept as target criteria):
 
 1. Instantiate env and call `reset`.
 2. Step with random actions for 10-20 steps.
@@ -176,14 +196,15 @@ Before training any RL model:
    - cash/holdings never violate constraints,
    - episode terminates at expected end date.
 
-Add unit tests:
+Testing policy for this project:
 
-- API compliance test (`reset`/`step` return signatures),
-- deterministic reward sanity test on fixed synthetic mini-data.
+- no separate test-suite files,
+- each module should include a `main()` smoke entrypoint for runtime verification,
+- API, reward, and invariant checks should be implemented inside module-level smoke flows.
 
 ---
 
-## 9) Integration Plan with SB3 (after env is stable)
+## 9) Integration Plan with SB3 (Remaining)
 
 Use this only after Section 8 passes:
 
@@ -196,11 +217,11 @@ Start with tiny smoke run (`1e3-1e4` timesteps) before any long run.
 
 ---
 
-## 10) Reproducibility Checklist
+## 10) Reproducibility Checklist (Remaining)
 
 - [ ] Fixed random seeds
 - [ ] Data source and split ranges documented
-- [ ] Environment config frozen in version control
+- [ ] Environment config frozen in version control (constructor defaults + run args)
 - [ ] Metrics computation script versioned
 - [ ] Output artifacts saved under `outputs/`
 - [ ] Any deviations from original paper explicitly documented
