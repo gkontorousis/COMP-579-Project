@@ -10,6 +10,18 @@ import numpy as np
 import gymnasium as gym
 from src.registration import register_stock_envs
 
+# Optuna search ranges for each hyperparameters
+# useful to have as consts to easily refer for paper specifying hyperparameter ranges tried
+TUNE_LR_LOW = 1e-4
+TUNE_LR_HIGH = 1e-3
+TUNE_BATCH_SIZES = [64, 128, 256]
+TUNE_GAMMA_LOW = 0.95
+TUNE_GAMMA_HIGH = 0.999
+TUNE_TAU_LOW = 0.001
+TUNE_TAU_HIGH = 0.01
+TUNE_SIGMA_LOW = 0.05
+TUNE_SIGMA_HIGH = 0.3
+
 _ALGO_CLASSES = {
     "ddpg": DDPG,
     "td3": TD3,
@@ -62,14 +74,13 @@ def train(algo, env, timesteps, seed, model_out, sigma=0.1, figure_out=None, **k
 
 
 def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials):
-
     # use Optuna (https://optuna.org) for hyperparameter optimization
     def objective(trial):
-        lr = trial.suggest_float("learning_rate", 1e-4, 1e-3, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
-        gamma = trial.suggest_float("gamma", 0.95, 0.999)
-        tau = trial.suggest_float("tau", 0.001, 0.01)
-        sigma = trial.suggest_float("noise_sigma", 0.05, 0.3)
+        lr = trial.suggest_float("learning_rate", TUNE_LR_LOW, TUNE_LR_HIGH, log=True)
+        batch_size = trial.suggest_categorical("batch_size", TUNE_BATCH_SIZES)
+        gamma = trial.suggest_float("gamma", TUNE_GAMMA_LOW, TUNE_GAMMA_HIGH)
+        tau = trial.suggest_float("tau", TUNE_TAU_LOW, TUNE_TAU_HIGH)
+        sigma = trial.suggest_float("noise_sigma", TUNE_SIGMA_LOW, TUNE_SIGMA_HIGH)
 
         train_env = DummyVecEnv([lambda: gym.make(train_env_id)])
         model = _build_model(
@@ -108,14 +119,10 @@ def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials):
 
 
 def trade_online(algo, model_path, env, model_out, figure_out=None):
-    """Load a trained model and continue training for one full test episode (online learning).
+    # As per the paper: 'we continue training our agent while in the trading stage as this
+    # will improve the agent to better adapt the market dynamics.'
 
-    As per the paper: 'we continue training our agent while in the trading stage as this
-    will improve the agent to better adapt the market dynamics.'
-
-    The env's step() saves the result figure on episode termination.
-    Saves the online-updated model to model_out.
-    """
+    # so we continue learning during the trading stage
     model_out = Path(model_out)
     model_out.parent.mkdir(parents=True, exist_ok=True)
     _set_figure_out(env, figure_out)
