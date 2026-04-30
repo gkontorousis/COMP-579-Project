@@ -31,6 +31,10 @@ class RunConfig:
     def test_figure_out(self) -> Path:
         return self.figure_dir / f"{self.model_out.name}_test.png"
 
+    @property
+    def metrics_out(self) -> Path:
+        return self.figure_dir / f"{self.model_out.name}_metrics.json"
+
     def mkdir(self) -> None:
         """Create the output directory (idempotent)."""
         self.figure_dir.mkdir(parents=True, exist_ok=True)

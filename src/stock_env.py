@@ -124,6 +124,7 @@ class StockEnv(gym.Env):
         truncated = False
 
         if terminated:
+            self.last_episode_asset_memory = list(self.asset_memory)
             plots.save_episode_result_figure(self, outfile=self.figure_out)
 
             total_reward = self._total_portfolio_value() - self.init_balance
