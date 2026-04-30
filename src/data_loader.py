@@ -65,10 +65,15 @@ def sanity_check() -> None:
     args = parser.parse_args()
     df = load_prices(args.path)
     train = build_daily_frames(df, mode="train")
+    validation = build_daily_frames(df, mode="validation")
     test = build_daily_frames(df, mode="test")
-    print("train days:", len(train), "test days:", len(test))
-    assert len(train) > 0 and len(test) > 0
-    assert all(len(d) == 28 for d in train)  # only if 28 is always true for your data
+    print("train days:", len(train), "validation days:", len(validation), "test days:", len(test))
+    assert len(train) > 0 and len(validation) > 0 and len(test) > 0
+    assert (
+        all(len(d) == 28 for d in train)
+        and all(len(d) == 28 for d in validation)
+        and all(len(d) == 28 for d in test)
+    )
 
 
 if __name__ == "__main__":

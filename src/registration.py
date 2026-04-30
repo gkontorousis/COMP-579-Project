@@ -33,6 +33,19 @@ def register_stock_envs(
             },
         )
 
+    if "RLStockValidation-v0" not in gym.envs.registry:
+        register(
+            id="RLStockValidation-v0",
+            entry_point="src.stock_env:StockEnv",
+            kwargs={
+                "data_path": data_path,
+                "mode": "validation",
+                "day": 0,
+                "init_balance": init_balance,
+                "max_shares_per_trade": max_shares_per_trade,
+            },
+        )
+
     if "RLStockTest-v0" not in gym.envs.registry:
         register(
             id="RLStockTest-v0",
