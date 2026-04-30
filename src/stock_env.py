@@ -27,6 +27,9 @@ class StockEnv(gym.Env):
         # TODO: Generalize creation of daily_data to be able to use other things than the build_daily_frames which right now
         # is loading the original (hardcoded) csv data
         self.daily_data = data_loader.build_daily_frames(pd.read_csv(data_path), mode)
+        self.prices_array = np.array(
+            [day_df["adjcp"].values for day_df in self.daily_data], dtype=np.float64
+        )
         self.mode = mode
         self.init_day = day
         self.init_balance = init_balance
@@ -49,8 +52,7 @@ class StockEnv(gym.Env):
             )
 
         self.day = day
-        self.data = self.daily_data[self.day]
-        self.n_stocks = len(self.data)
+        self.n_stocks = self.prices_array.shape[1]
 
         self.terminal_day = len(self.daily_data) - 1
 
@@ -74,7 +76,7 @@ class StockEnv(gym.Env):
         )
 
         self.state = (
-            [init_balance] + self.data.adjcp.values.tolist() + [0 for i in range(self.n_stocks)]
+            [init_balance] + self.prices_array[self.init_day].tolist() + [0 for i in range(self.n_stocks)]
         )
 
         self.reward = 0
@@ -145,11 +147,10 @@ class StockEnv(gym.Env):
             self._buy_stock(idx, actions[idx])
 
         self.day += 1
-        self.data = self.daily_data[self.day]
 
         self.state = (
             [self.state[self.__state_cash_idx]]
-            + self.data.adjcp.values.tolist()
+            + self.prices_array[self.day].tolist()
             + list(self.state[self.__state_holdings_offset :])
         )
         end_total_asset = self.state[self.__state_cash_idx] + sum(
@@ -172,10 +173,9 @@ class StockEnv(gym.Env):
 
         self.asset_memory = [self.init_balance]
         self.day = self.init_day
-        self.data = self.daily_data[self.day]
         self.state = (
             [self.init_balance]
-            + self.data.adjcp.values.tolist()
+            + self.prices_array[self.day].tolist()
             + [0 for i in range(self.n_stocks)]
         )
 
