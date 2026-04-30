@@ -5,7 +5,7 @@ This plan reflects the current implementation choices while preserving the origi
 Paper target:
 
 - Xiong, Z., Liu, X.Y., Zhong, S., Yang, H., and Walid, A. (2018).
-  _Practical Deep Reinforcement Learning Approach for Stock Trading_.
+*Practical Deep Reinforcement Learning Approach for Stock Trading*.
 
 ---
 
@@ -23,16 +23,17 @@ This plan intentionally avoids legacy environment injection into `site-packages/
 
 ## Progress Checklist
 
-- [X] Port environment to Gymnasium API in `src/stock_env.py`
-- [X] Consolidate data loading/preprocessing in `src/data_loader.py`
-- [X] Register train/test env IDs in `src/registration.py`
-- [X] Add per-module smoke test entrypoints (`main()`)
-- [X] Run smoke checks for train/test env behavior
-- [X] Run SB3 smoke training with DDPG
-- [ ] Add validation split configuration from paper/date protocol
-- [ ] Register validation env (`RLStockValidation-v0`)
-- [ ] Run validation-stage hyperparameter selection
-- [ ] Final reproducibility documentation/artifacts cleanup
+- Port environment to Gymnasium API in `src/stock_env.py`
+- Consolidate data loading/preprocessing in `src/data_loader.py`
+- Register train/test env IDs in `src/registration.py`
+- Add per-module smoke test entrypoints (`main()`)
+- Run smoke checks for train/test env behavior
+- Run SB3 smoke training with DDPG
+- Add validation split configuration from paper/date protocol
+- Register validation env (`RLStockValidation-v0`)
+- Run validation-stage hyperparameter selection
+- Add min-variance benchmark for comparisons
+- Final reproducibility documentation/artifacts cleanup
 
 ---
 
@@ -116,22 +117,22 @@ Deviation from original draft recommendation:
 
 ### Step 6.1: Load raw data
 
-- [X] CSV loading is local-path based through `src/data_loader.py` (`load_prices`)
+- CSV loading is local-path based through `src/data_loader.py` (`load_prices`)
 
 ### Step 6.2: Reproduce preprocessing
 
-- [X] Filter tickers/date windows
-- [X] Compute adjusted prices (`adjcp`)
-- [X] Build chronological per-day slices
+- Filter tickers/date windows
+- Compute adjusted prices (`adjcp`)
+- Build chronological per-day slices
 
 ### Step 6.3: Split by mode
 
-- [X] `train` split implemented in `build_daily_frames`
-- [X] `test` split implemented in `build_daily_frames`
-- [ ] `validation` split configuration
-  - [ ] Confirm train/validation/trade date ranges from paper + original implementation notes
-  - [ ] Add `mode="validation"` support in `build_daily_frames`
-  - [ ] Add smoke check for validation slice shape/length
+- `train` split implemented in `build_daily_frames`
+- `test` split implemented in `build_daily_frames`
+- `validation` split configuration
+  - Confirm train/validation/trade date ranges from paper + original implementation notes
+  - Add `mode="validation"` support in `build_daily_frames`
+  - Add smoke check for validation slice shape/length
 
 ---
 
@@ -139,70 +140,82 @@ Deviation from original draft recommendation:
 
 ### Task A: Configuration strategy
 
-- [X] Dynamic constructor-based configuration (no separate `stock_env_config.py`)
-- [ ] Keep defaults centralized/documented for reproducibility (final README + plan pass)
+- Dynamic constructor-based configuration (no separate `stock_env_config.py`)
+- Keep defaults centralized/documented for reproducibility (final README + plan pass)
 
 ### Task B: Data layer
 
-- [X] `load_prices(path)`
-- [X] `build_daily_frames(df, mode)`
-- [ ] Remove pandas boolean-mask reindex warning in preprocessing
+- `load_prices(path)`
+- `build_daily_frames(df, mode)`
+- Remove pandas boolean-mask reindex warning in preprocessing
 
 ### Task C: `stock_env.py`
 
-- [X] Environment state creation
-- [X] Buy/sell execution
-- [X] Reward calculation
-- [X] `asset_memory` tracking
-- [X] Terminal handling + info dict
-- [X] DJI benchmark growth for test-mode plotting
+- Environment state creation
+- Buy/sell execution
+- Reward calculation
+- `asset_memory` tracking
+- Terminal handling + info dict
+- DJI benchmark growth for test-mode plotting
+- Add min-variance benchmark growth for test-mode comparison (same style as DJI growth, computed from episode dates)
 
 ### Task D: `registration.py`
 
-- [X] Register `RLStockTrain-v0`
-- [X] Register `RLStockTest-v0`
-- [X] Guard against duplicate registration
-- [ ] Add `RLStockValidation-v0` after validation split ranges are finalized
+- Register `RLStockTrain-v0`
+- Register `RLStockTest-v0`
+- Guard against duplicate registration
+- Add `RLStockValidation-v0` after validation split ranges are finalized
 
 ---
 
 ## 8) Validation and Smoke Test Checklist
 
-- [X] Env runs in both `train` and `test` modes through `src/stock_env.py` `main`
-- [X] Random-step execution reaches terminal for both modes
-- [X] Runtime checks in smoke flow:
+- Env runs in both `train` and `test` modes through `src/stock_env.py` `main`
+- Random-step execution reaches terminal for both modes
+- Runtime checks in smoke flow:
   - observation shape/dtype stability
   - finite rewards/observations
   - cash/holdings invariants
   - action input robustness
   - asset-memory/portfolio-value consistency
-- [ ] Validation-mode smoke checks after split is implemented
+- Validation-mode smoke checks after split is implemented
 
 Testing policy for this project:
 
-- [X] No separate test-suite files
-- [X] Per-module `main()` smoke entrypoints
-- [X] API/reward/invariant checks embedded in smoke flows
+- No separate test-suite files
+- Per-module `main()` smoke entrypoints
+- API/reward/invariant checks embedded in smoke flows
 
 ---
 
 ## 9) Integration with SB3 Checklist
 
-- [X] SB3 smoke run completed (`DDPG` + `MlpPolicy` + `DummyVecEnv`)
-- [X] Tiny timesteps smoke training executed successfully
-- [ ] Validation-stage hyperparameter sweep (using validation split once added)
-- [ ] Final train/test protocol run for report-quality results
+- SB3 smoke run completed (`DDPG` + `MlpPolicy` + `DummyVecEnv`)
+- Tiny timesteps smoke training executed successfully
+- Validation-stage hyperparameter sweep (using validation split once added)
+- Final train/test protocol run for report-quality results
+
+---
+
+## 9.1) Benchmark Comparison Checklist
+
+- Keep DJI buy-and-hold comparison in test/trade outputs
+- Add min-variance portfolio benchmark (long-only, fully invested)
+- Ensure benchmark uses same stock universe and same test dates as env episode
+- Rebalance at a documented cadence (e.g., monthly) using only historical data up to rebalance date
+- Report side-by-side metrics: agent vs DJI vs min-variance
 
 ---
 
 ## 10) Reproducibility Checklist
 
-- [ ] Fixed random seeds
-- [ ] Data source and split ranges documented
-- [ ] Environment config frozen in version control (constructor defaults + run args)
-- [ ] Metrics computation script versioned
-- [ ] Output artifacts saved under `outputs/`
-- [ ] Any deviations from original paper explicitly documented
+- Fixed random seeds
+- Data source and split ranges documented
+- Environment config frozen in version control (constructor defaults + run args)
+- Metrics computation script versioned
+- Benchmark assumptions documented (min-variance estimator, constraints, rebalance frequency)
+- Output artifacts saved under `outputs/`
+- Any deviations from original paper explicitly documented
 
 ---
 
@@ -213,3 +226,4 @@ This environment re-implementation should credit:
 - Original project: [hust512/DQN-DDPG_Stock_Trading](https://github.com/hust512/DQN-DDPG_Stock_Trading)
 - Original paper: arXiv / NeurIPS workshop publication
 - Modern environment API: [Farama Gymnasium](https://gymnasium.farama.org/)
+
