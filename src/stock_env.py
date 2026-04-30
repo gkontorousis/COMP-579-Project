@@ -84,6 +84,10 @@ class StockEnv(gym.Env):
         self.reward = 0
         self.asset_memory = [init_balance]
 
+        # Set by the caller (e.g. rl_algos.train / trade_online) to control where
+        # the episode-result figure is written.  None → default names in cwd.
+        self.figure_out: Path | None = None
+
         self.reset()
         self._seed()
 
@@ -120,7 +124,7 @@ class StockEnv(gym.Env):
         truncated = False
 
         if terminated:
-            plots.save_episode_result_figure(self)
+            plots.save_episode_result_figure(self, outfile=self.figure_out)
 
             total_reward = self._total_portfolio_value() - self.init_balance
             print(f"total_reward: {total_reward}")

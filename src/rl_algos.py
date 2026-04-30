@@ -42,11 +42,22 @@ def _build_model(algo, env, seed, sigma, verbose, **kwargs):
     )
 
 
-def train(algo, env, timesteps, seed, model_out, sigma=0.1, **kwargs):
+def _set_figure_out(vec_env, figure_out) -> None:
+    """Push a figure output path onto every inner StockEnv in a VecEnv."""
+    if figure_out is None:
+        return
+    figure_out = Path(figure_out)
+    for e in vec_env.envs:
+        e.unwrapped.figure_out = figure_out
+
+
+def train(algo, env, timesteps, seed, model_out, sigma=0.1, figure_out=None, **kwargs):
     """Build and train a model from scratch, save to model_out."""
+    model_out = Path(model_out)
+    model_out.parent.mkdir(parents=True, exist_ok=True)
+    _set_figure_out(env, figure_out)
     model = _build_model(algo, env, seed, sigma, verbose=1, **kwargs)
     model.learn(total_timesteps=timesteps)
-    model_out.parent.mkdir(parents=True, exist_ok=True)
     model.save(str(model_out))
 
 
@@ -96,7 +107,7 @@ def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials):
     return study.best_params
 
 
-def trade_online(algo, model_path, env, model_out):
+def trade_online(algo, model_path, env, model_out, figure_out=None):
     """Load a trained model and continue training for one full test episode (online learning).
 
     As per the paper: 'we continue training our agent while in the trading stage as this
@@ -105,10 +116,12 @@ def trade_online(algo, model_path, env, model_out):
     The env's step() saves the result figure on episode termination.
     Saves the online-updated model to model_out.
     """
+    model_out = Path(model_out)
+    model_out.parent.mkdir(parents=True, exist_ok=True)
+    _set_figure_out(env, figure_out)
     model = algo.load(str(model_path), env=env)
     timesteps = env.envs[0].unwrapped.terminal_day + 1
     model.learn(total_timesteps=timesteps, reset_num_timesteps=False)
-    model_out.parent.mkdir(parents=True, exist_ok=True)
     model.save(str(model_out))
 
 

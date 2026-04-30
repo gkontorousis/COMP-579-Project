@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 from stable_baselines3.common.vec_env import DummyVecEnv
 import gymnasium as gym
+from src.config import RunConfig
 from src.registration import register_stock_envs
 from src import rl_algos
 
@@ -38,6 +39,9 @@ def main():
     if args.model_out is None:
         args.model_out = Path("outputs") / f"{args.algo}_model"
 
+    cfg = RunConfig(algo_name=args.algo, seed=args.seed, model_out=args.model_out)
+    cfg.mkdir()
+
     register_stock_envs(
         data_path=args.dj_30_dp_path,
         dji_path=args.dji_path,
@@ -65,25 +69,29 @@ def main():
     train_env = DummyVecEnv([lambda: gym.make("RLStockTrain-v0")])
     print(f"Training for {args.timesteps} timesteps ...")
     rl_algos.train(
-        algo_cls, train_env, args.timesteps, args.seed, args.model_out, sigma=sigma, **best_params
+        algo_cls, train_env, args.timesteps, args.seed, cfg.model_out,
+        sigma=sigma, figure_out=cfg.train_figure_out, **best_params,
     )
     train_env.close()
-    print(f"Model saved to {args.model_out}")
+    print(f"Model saved to {cfg.model_out}")
 
     # --- trade: test episode with continued online training ---
-    online_model_out = args.model_out.parent / (args.model_out.name + "_online")
     test_env = DummyVecEnv([lambda: gym.make("RLStockTest-v0")])
     print("Trading (online learning on test episode) ...")
-    rl_algos.trade_online(algo_cls, args.model_out, test_env, online_model_out)
+    rl_algos.trade_online(
+        algo_cls, cfg.model_out, test_env, cfg.online_model_out,
+        figure_out=cfg.test_figure_out,
+    )
     test_env.close()
 
     print("\n--- Summary ---")
-    print(f"  Algorithm         : {args.algo.upper()}")
+    print(f"  Algorithm         : {cfg.algo_name.upper()}")
     if args.n_trials > 0:
         print(f"  Best tuned params : {best_params}, noise_sigma={sigma:.3f}")
-    print(f"  Model             : {args.model_out}")
-    print(f"  Online model      : {online_model_out}")
-    print("  Result figure     : result_test.png")
+    print(f"  Model             : {cfg.model_out}")
+    print(f"  Online model      : {cfg.online_model_out}")
+    print(f"  Train figure      : {cfg.train_figure_out}")
+    print(f"  Test figure       : {cfg.test_figure_out}")
 
 
 if __name__ == "__main__":
