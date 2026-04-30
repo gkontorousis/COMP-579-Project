@@ -292,5 +292,7 @@ def main():
         print(f"Smoke test passed for mode={run_mode}. steps={steps}, final_reward={reward:.4f}")
 
 
+# run command
+# uv run python -m src.stock_env --dj_30_dp_path data/dow_jones_30_daily_price.csv --dji_path 'data/^DJI.csv' --mode full
 if __name__ == "__main__":
     main()
