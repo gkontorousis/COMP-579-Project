@@ -6,42 +6,57 @@ from pathlib import Path
 DATA_PATH = "data/"
 
 # from the original files preprocessing pipeline they used this value so we reuse it here
-TICKER_COUNT_MAGIC_NUM= 4711
+TICKER_COUNT_MAGIC_NUM = 4711
+
 
 def load_prices(path):
     return pd.read_csv(path)
 
 
-def build_daily_frames(df: pd.DataFrame, mode: str ="train"):
-    data_1=df.copy()
+def build_daily_frames(df: pd.DataFrame, mode: str = "train"):
+    if mode not in ["train", "validation", "test"]:
+        raise ValueError("Invalid mode")
+
+    data_1 = df.copy()
     equal_magic_num_list = list(data_1.tic.value_counts() == TICKER_COUNT_MAGIC_NUM)
     names = data_1.tic.value_counts().index
 
     # select_stocks_list = ['NKE','KO']
-    select_stocks_list = list(names[equal_magic_num_list])+['NKE','KO']
+    select_stocks_list = list(names[equal_magic_num_list]) + ["NKE", "KO"]
 
-    data_2 = data_1[data_1.tic.isin(select_stocks_list)][~data_1.datadate.isin(['20010912','20010913'])]
+    data_2 = data_1[data_1.tic.isin(select_stocks_list)][
+        ~data_1.datadate.isin(["20010912", "20010913"])
+    ]
 
-    data_3 = data_2[['iid','datadate','tic','prccd','ajexdi']]
+    data_3 = data_2[["iid", "datadate", "tic", "prccd", "ajexdi"]]
 
-    data_3['adjcp'] = data_3['prccd'] / data_3['ajexdi']
+    data_3["adjcp"] = data_3["prccd"] / data_3["ajexdi"]
 
+    # note here that we use datadates corresponding to the paper's specification of the train/validation/test splits
+    # which are interestingly different from the original implementation
     if mode == "train":
-        data = data_3[(data_3.datadate > 20090000) & (data_3.datadate < 20160000)]
+        data = data_3[(data_3.datadate >= 20090101) & (data_3.datadate <= 20141231)]
+        daily_data = []
+        for date in np.unique(data.datadate):
+            daily_data.append(data[data.datadate == date])
+    elif mode == "validation":
+        data = data_3[(data_3.datadate >= 20150101) & (data_3.datadate < 20160101)]
         daily_data = []
         for date in np.unique(data.datadate):
             daily_data.append(data[data.datadate == date])
     else:
-        data = data_3[data_3.datadate > 20160000]
+        data = data_3[(data_3.datadate >= 20160101) & (data_3.datadate < 20181001)]
         daily_data = []
         for date in np.unique(data.datadate):
             daily_data.append(data[data.datadate == date])
-    
+
     return daily_data
 
 
 def sanity_check() -> None:
-    parser = argparse.ArgumentParser(description="Load price CSV and build daily frames (smoke / debug).")
+    parser = argparse.ArgumentParser(
+        description="Load price CSV and build daily frames (smoke / debug)."
+    )
     parser.add_argument(
         "path",
         type=Path,
@@ -60,23 +75,24 @@ if __name__ == "__main__":
     sanity_check()
 
 
-
-
 # ORIGINAL METHODS
 
+
 def __data_preprocess_test(df):
-    data_1=df.copy()
+    data_1 = df.copy()
     equal_4711_list = list(data_1.tic.value_counts() == 4711)
     names = data_1.tic.value_counts().index
 
     # select_stocks_list = ['NKE','KO']
-    select_stocks_list = list(names[equal_4711_list])+['NKE','KO']
+    select_stocks_list = list(names[equal_4711_list]) + ["NKE", "KO"]
 
-    data_2 = data_1[data_1.tic.isin(select_stocks_list)][~data_1.datadate.isin(['20010912','20010913'])]
+    data_2 = data_1[data_1.tic.isin(select_stocks_list)][
+        ~data_1.datadate.isin(["20010912", "20010913"])
+    ]
 
-    data_3 = data_2[['iid','datadate','tic','prccd','ajexdi']]
+    data_3 = data_2[["iid", "datadate", "tic", "prccd", "ajexdi"]]
 
-    data_3['adjcp'] = data_3['prccd'] / data_3['ajexdi']
+    data_3["adjcp"] = data_3["prccd"] / data_3["ajexdi"]
 
     test_data = data_3[data_3.datadate > 20160000]
     test_daily_data = []
@@ -87,23 +103,24 @@ def __data_preprocess_test(df):
 
 
 def __data_preprocess_train(df):
-    data_1=df.copy()
+    data_1 = df.copy()
     equal_4711_list = list(data_1.tic.value_counts() == 4711)
     names = data_1.tic.value_counts().index
 
     # select_stocks_list = ['NKE','KO']
-    select_stocks_list = list(names[equal_4711_list])+['NKE','KO']
+    select_stocks_list = list(names[equal_4711_list]) + ["NKE", "KO"]
 
-    data_2 = data_1[data_1.tic.isin(select_stocks_list)][~data_1.datadate.isin(['20010912','20010913'])]
+    data_2 = data_1[data_1.tic.isin(select_stocks_list)][
+        ~data_1.datadate.isin(["20010912", "20010913"])
+    ]
 
-    data_3 = data_2[['iid','datadate','tic','prccd','ajexdi']]
+    data_3 = data_2[["iid", "datadate", "tic", "prccd", "ajexdi"]]
 
-    data_3['adjcp'] = data_3['prccd'] / data_3['ajexdi']
+    data_3["adjcp"] = data_3["prccd"] / data_3["ajexdi"]
 
     train_data = data_3[(data_3.datadate > 20090000) & (data_3.datadate < 20160000)]
     train_daily_data = []
     for date in np.unique(train_data.datadate):
         train_daily_data.append(train_data[train_data.datadate == date])
-
 
     return train_daily_data
