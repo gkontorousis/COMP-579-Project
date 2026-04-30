@@ -236,7 +236,7 @@ def main():
     data_path = args.dj_30_dp_path
     dji_path = args.dji_path
     mode = args.mode
-    modes_to_run = ["train", "test"] if mode == "full" else [mode]
+    modes_to_run = ["train", "validation", "test"] if mode == "full" else [mode]
     for run_mode in modes_to_run:
         env = StockEnv(
             data_path=data_path,
