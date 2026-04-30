@@ -31,6 +31,14 @@ def _compute_dji_account_growth(
     return growth.to_numpy()
 
 
+def _compute_min_variance_portfolio_growth(
+    path, episode_dates, init_balance, date_col="Date", price_col="Adj Close"
+):
+    # TODO: Implement min variance portfolio computation
+    # use pyportfolioopt to compute the min variance portfolio
+    return 0.0
+
+
 class StockEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
 
