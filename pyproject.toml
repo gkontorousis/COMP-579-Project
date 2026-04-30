@@ -41,3 +41,6 @@ torchaudio = [
 name = "pytorch-cu124"
 url = "https://download.pytorch.org/whl/cu124"
 explicit = true
+
+[tool.ruff]
+line-length = 100
