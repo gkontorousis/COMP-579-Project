@@ -76,7 +76,9 @@ class StockEnv(gym.Env):
         )
 
         self.state = (
-            [init_balance] + self.prices_array[self.init_day].tolist() + [0 for i in range(self.n_stocks)]
+            [init_balance]
+            + self.prices_array[self.init_day].tolist()
+            + [0 for i in range(self.n_stocks)]
         )
 
         self.reward = 0
