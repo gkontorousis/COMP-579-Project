@@ -6,6 +6,15 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 import argparse
 
+ORIGINAL_TRAIN = "RLStockTrain-v0"
+ORIGINAL_VALIDATE = "RLStockValidation-v0"
+ORIGINAL_TRADE = "RLStockTest-v0"
+
+# we only use train and test split; we reuse the best hyperparameters found from the original paper's date
+# range optuna hyperparameter run due to time constraints
+COVID_TRAIN = "Covid_RLStockTrain"
+COVID_TRADE = "Covid_RLStockTrade"
+
 
 def register_stock_envs(
     data_path: Path | str,
@@ -13,16 +22,12 @@ def register_stock_envs(
     init_balance: int = 10_000,
     max_shares_per_trade: int = 5,
 ) -> None:
-    """
-    Register train/test stock env IDs that both map to StockEnv,
-    using mode-specific kwargs.
-    """
     data_path = str(data_path)
     dji_path = None if dji_path is None else str(dji_path)
 
-    if "RLStockTrain-v0" not in gym.envs.registry:
+    if ORIGINAL_TRAIN not in gym.envs.registry:
         register(
-            id="RLStockTrain-v0",
+            id=ORIGINAL_TRAIN,
             entry_point="src.stock_env:StockEnv",
             kwargs={
                 "data_path": data_path,
@@ -33,9 +38,9 @@ def register_stock_envs(
             },
         )
 
-    if "RLStockValidation-v0" not in gym.envs.registry:
+    if ORIGINAL_VALIDATE not in gym.envs.registry:
         register(
-            id="RLStockValidation-v0",
+            id=ORIGINAL_VALIDATE,
             entry_point="src.stock_env:StockEnv",
             kwargs={
                 "data_path": data_path,
@@ -46,9 +51,9 @@ def register_stock_envs(
             },
         )
 
-    if "RLStockTest-v0" not in gym.envs.registry:
+    if ORIGINAL_TRADE not in gym.envs.registry:
         register(
-            id="RLStockTest-v0",
+            id=ORIGINAL_TRADE,
             entry_point="src.stock_env:StockEnv",
             kwargs={
                 "data_path": data_path,
@@ -83,10 +88,10 @@ def main():
     dji_path = args.dji_path
 
     register_stock_envs(data_path=data_path, dji_path=dji_path)
-    assert "RLStockTrain-v0" in gym.envs.registry
-    assert "RLStockTest-v0" in gym.envs.registry
-    train_env = gym.make("RLStockTrain-v0")
-    test_env = gym.make("RLStockTest-v0")
+    assert ORIGINAL_TRAIN in gym.envs.registry
+    assert ORIGINAL_TRADE in gym.envs.registry
+    train_env = gym.make(ORIGINAL_TRAIN)
+    test_env = gym.make(ORIGINAL_TRADE)
     for env in (train_env, test_env):
         obs, info = env.reset(seed=42)
         action = env.action_space.sample()

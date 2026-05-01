@@ -8,7 +8,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 import gymnasium as gym
-from src.registration import register_stock_envs
+from src.registration import ORIGINAL_TRADE, ORIGINAL_TRAIN, register_stock_envs
 
 # Optuna search ranges for each hyperparameters
 # useful to have as consts to easily refer for paper specifying hyperparameter ranges tried
@@ -158,11 +158,11 @@ def main():
 
     register_stock_envs(data_path=args.dj_30_dp_path, dji_path=args.dji_path)
 
-    train_env = DummyVecEnv([lambda: gym.make("RLStockTrain-v0")])
+    train_env = DummyVecEnv([lambda: gym.make(ORIGINAL_TRAIN)])
     train(algo_cls, train_env, args.timesteps, args.seed, args.model_out)
     train_env.close()
 
-    test_env = DummyVecEnv([lambda: gym.make("RLStockTest-v0")])
+    test_env = DummyVecEnv([lambda: gym.make(ORIGINAL_TRADE)])
     online_out = args.model_out.parent / (args.model_out.name + "_online")
     trade_online(algo_cls, args.model_out, test_env, online_out)
     test_env.close()

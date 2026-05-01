@@ -11,7 +11,12 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 import gymnasium as gym
 from src.config import RunConfig
 from src.data_loader import build_daily_frames
-from src.registration import register_stock_envs
+from src.registration import (
+    ORIGINAL_TRADE,
+    ORIGINAL_TRAIN,
+    ORIGINAL_VALIDATE,
+    register_stock_envs,
+)
 from src import rl_algos
 from src.baseline_strategies import compute_portfolio_metrics
 
@@ -46,7 +51,7 @@ def run_one_seed(task):
     )
 
     log(f"[seed={seed}] train start (timesteps={task['timesteps']})")
-    train_env = DummyVecEnv([lambda: gym.make("RLStockTrain-v0")])
+    train_env = DummyVecEnv([lambda: gym.make(ORIGINAL_TRAIN)])
     rl_algos.train(
         algo_cls,
         train_env,
@@ -60,7 +65,7 @@ def run_one_seed(task):
     train_env.close()
 
     log(f"[seed={seed}] trade start")
-    test_env = DummyVecEnv([lambda: gym.make("RLStockTest-v0")])
+    test_env = DummyVecEnv([lambda: gym.make(ORIGINAL_TRADE)])
     rl_algos.trade_online(
         algo_cls,
         cfg.model_out,
@@ -202,8 +207,8 @@ def main():
         )
         best_params = rl_algos.tune(
             algo_cls,
-            "RLStockTrain-v0",
-            "RLStockValidation-v0",
+            ORIGINAL_TRAIN,
+            ORIGINAL_VALIDATE,
             timesteps_per_trial,
             seeds[0],
             args.n_trials,

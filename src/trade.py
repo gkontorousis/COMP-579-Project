@@ -3,7 +3,7 @@ import argparse
 from stable_baselines3.common.vec_env import DummyVecEnv
 import gymnasium as gym
 from src.config import RunConfig
-from src.registration import register_stock_envs
+from src.registration import ORIGINAL_TRADE, register_stock_envs
 from src import rl_algos
 
 
@@ -14,7 +14,7 @@ def trade(algo, model_path, env, model_out, figure_out=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        "Trade/test with online learning on RLStockTest-v0", allow_abbrev=False
+        f"Trade/test with online learning on {ORIGINAL_TRADE}", allow_abbrev=False
     )
     parser.add_argument("--dj_30_dp_path", type=Path, required=True)
     parser.add_argument("--dji_path", type=Path, required=True)
@@ -41,7 +41,7 @@ def main():
     cfg.mkdir()
 
     register_stock_envs(data_path=args.dj_30_dp_path, dji_path=args.dji_path)
-    env = DummyVecEnv([lambda: gym.make("RLStockTest-v0")])
+    env = DummyVecEnv([lambda: gym.make(ORIGINAL_TRADE)])
     trade(algo_cls, args.model_path, env, cfg.online_model_out, figure_out=cfg.test_figure_out)
     env.close()
     print(f"Online-updated model saved to {cfg.online_model_out}")
