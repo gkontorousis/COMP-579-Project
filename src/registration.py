@@ -66,6 +66,47 @@ def register_stock_envs(
         )
 
 
+def register_covid_stock_envs(
+    train_data_path: Path | str,
+    trade_data_path: Path | str,
+    dji_path: Path | str | None = None,
+    init_balance: int = 10_000,
+    max_shares_per_trade: int = 5,
+) -> None:
+    train_data_path = str(train_data_path)
+    trade_data_path = str(trade_data_path)
+    dji_path = None if dji_path is None else str(dji_path)
+
+    if COVID_TRAIN not in gym.envs.registry:
+        register(
+            id=COVID_TRAIN,
+            entry_point="src.stock_env:StockEnv",
+            kwargs={
+                "data_path": train_data_path,
+                "mode": "train",
+                "day": 0,
+                "init_balance": init_balance,
+                "max_shares_per_trade": max_shares_per_trade,
+                "from_yfinance": True,
+            },
+        )
+
+    if COVID_TRADE not in gym.envs.registry:
+        register(
+            id=COVID_TRADE,
+            entry_point="src.stock_env:StockEnv",
+            kwargs={
+                "data_path": trade_data_path,
+                "mode": "test",
+                "day": 0,
+                "init_balance": init_balance,
+                "max_shares_per_trade": max_shares_per_trade,
+                "dji_path": dji_path,
+                "from_yfinance": True,
+            },
+        )
+
+
 def main():
     # smoke test to verify that no runtime errors occur
     args_parser = argparse.ArgumentParser(

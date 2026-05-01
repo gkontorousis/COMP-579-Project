@@ -22,11 +22,14 @@ class StockEnv(gym.Env):
         init_balance=10_000,
         max_shares_per_trade=5,
         dji_path=None,
+        from_yfinance=False,
     ):
         # save initialization arg vals
         # TODO: Generalize creation of daily_data to be able to use other things than the build_daily_frames which right now
         # is loading the original (hardcoded) csv data
-        self.daily_data = data_loader.build_daily_frames(pd.read_csv(data_path), mode)
+        self.daily_data = data_loader.build_daily_frames(
+            pd.read_csv(data_path), mode, from_yfinance
+        )
         self.prices_array = np.array(
             [day_df["adjcp"].values for day_df in self.daily_data], dtype=np.float64
         )
@@ -40,11 +43,22 @@ class StockEnv(gym.Env):
                 raise ValueError("dji_path must be provided when mode='test'.")
 
             episode_dates = bstrat.episode_dates_series(self.daily_data)
-            self.dji_growth = bstrat.compute_dji_account_growth(
-                path=dji_path,
-                episode_dates=episode_dates,
-                init_balance=self.init_balance,
-            )
+
+            # handle the fact that dji csv from yfinance has different column names than the original csv from the original paper repo
+            if from_yfinance:
+                self.dji_growth = bstrat.compute_dji_account_growth(
+                    path=dji_path,
+                    episode_dates=episode_dates,
+                    init_balance=self.init_balance,
+                    date_col="date",
+                    price_col="adjcp",
+                )
+            else:
+                self.dji_growth = bstrat.compute_dji_account_growth(
+                    path=dji_path,
+                    episode_dates=episode_dates,
+                    init_balance=self.init_balance,
+                )
             self.min_variance_growth = bstrat.compute_min_variance_portfolio_growth(
                 self.daily_data,
                 episode_dates,
