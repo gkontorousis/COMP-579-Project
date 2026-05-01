@@ -7,7 +7,7 @@
 % The authors should use one of these tracks.
 % Before accepting by the NeurIPS conference, select one of the options below.
 % 0. "default" for submission
-\usepackage[final]{neurips_2026}
+\usepackage[main, final]{neurips_2026}
 % the "default" option is equal to the "main" option, which is used for the Main Track with double-blind reviewing.
 % 1. "main" option is used for the Main Track
 %  \usepackage[main]{neurips_2026}
@@ -120,7 +120,7 @@ Following Liu et al.\ \cite{liu2018practical}, we model the stock-trading proble
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.95\linewidth]{pics/markov.png}
+    \includegraphics[width=0.95\linewidth]{resources/markov.png}
     \caption{Stock-trading MDP used in our reproduction. The agent observes cash, current prices, and current holdings, then selects bounded buy/sell actions. The environment executes trades, advances to the next trading day, and returns the change in portfolio value as the reward.}
     \label{fig:mdp_trading}
 \end{figure}
@@ -238,14 +238,14 @@ Sharpe Ratio & 1.51 $(0.15)$ & 1.68 $(0.20)$ & 1.15 & 1.51 \\
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.95\linewidth]{pics/ddpg_model_test.png}
+    \includegraphics[width=0.95\linewidth]{resources/ddpg_model_test.png}
     \caption{DDPG portfolio value over the trading period compared against DJIA and the min-variance baseline. (seed 42)}
     \label{fig:ddpg_results}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.95\linewidth]{pics/td3_model_test.png}
+    \includegraphics[width=0.95\linewidth]{resources/td3_model_test.png}
     \caption{TD3 portfolio value over the trading period compared against DJIA and the min-variance baseline. (seed 42)}
     \label{fig:td3_results}
 \end{figure}
@@ -268,7 +268,7 @@ TD3 achieved the strongest performance in our experiments, outperforming DDPG in
 % In the unusual situation where you want a paper to appear in the
 % references without citing it in the main text, use \nocite
 \bibliographystyle{plainnat}
-\bibliography{example_paper}
+\bibliography{report}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
