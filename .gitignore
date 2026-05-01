@@ -4,4 +4,4 @@
 *.pyc
 *__pycache__*
 outputs/
-notebooks/yahoo_finance_stock_env_demo.ipynb
+.latex-out/**
