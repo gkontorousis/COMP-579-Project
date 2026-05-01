@@ -63,17 +63,23 @@ def _set_figure_out(vec_env, figure_out) -> None:
         e.unwrapped.figure_out = figure_out
 
 
+def _set_plotting_enabled(vec_env, enabled: bool) -> None:
+    # used for disabling plotting during optuna tuning
+    for e in vec_env.envs:
+        e.unwrapped.plot_enabled = enabled
+
+
 def train(algo, env, timesteps, seed, model_out, sigma=0.1, figure_out=None, **kwargs):
     """Build and train a model from scratch, save to model_out."""
     model_out = Path(model_out)
     model_out.parent.mkdir(parents=True, exist_ok=True)
     _set_figure_out(env, figure_out)
-    model = _build_model(algo, env, seed, sigma, verbose=1, **kwargs)
+    model = _build_model(algo, env, seed, sigma, verbose=0, **kwargs)
     model.learn(total_timesteps=timesteps)
     model.save(str(model_out))
 
 
-def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials):
+def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials, n_jobs):
     # use Optuna (https://optuna.org) for hyperparameter optimization
     def objective(trial):
         lr = trial.suggest_float("learning_rate", TUNE_LR_LOW, TUNE_LR_HIGH, log=True)
@@ -83,6 +89,7 @@ def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials):
         sigma = trial.suggest_float("noise_sigma", TUNE_SIGMA_LOW, TUNE_SIGMA_HIGH)
 
         train_env = DummyVecEnv([lambda: gym.make(train_env_id)])
+        _set_plotting_enabled(train_env, False)
         model = _build_model(
             algo,
             train_env,
@@ -98,6 +105,7 @@ def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials):
         train_env.close()
 
         val_env = DummyVecEnv([lambda: gym.make(val_env_id)])
+        _set_plotting_enabled(val_env, False)
         obs = val_env.reset()
         done = False
         total_reward = 0.0
@@ -114,7 +122,7 @@ def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials):
         direction="maximize",
         sampler=optuna.samplers.TPESampler(seed=seed),
     )
-    study.optimize(objective, n_trials=n_trials)
+    study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs)
     return study.best_params
 
 

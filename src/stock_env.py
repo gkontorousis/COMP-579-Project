@@ -84,9 +84,9 @@ class StockEnv(gym.Env):
         self.reward = 0
         self.asset_memory = [init_balance]
 
-        # Set by the caller (e.g. rl_algos.train / trade_online) to control where
-        # the episode-result figure is written.  None → default names in cwd.
         self.figure_out: Path | None = None
+        # added flag to control plotting during tuning with optuna as was getting errors when using n_jobs > 1
+        self.plot_enabled: bool = True
 
         self.reset()
         self._seed()
@@ -125,10 +125,8 @@ class StockEnv(gym.Env):
 
         if terminated:
             self.last_episode_asset_memory = list(self.asset_memory)
-            plots.save_episode_result_figure(self, outfile=self.figure_out)
-
-            total_reward = self._total_portfolio_value() - self.init_balance
-            print(f"total_reward: {total_reward}")
+            if self.plot_enabled:
+                plots.save_episode_result_figure(self, outfile=self.figure_out)
 
             obs = np.asarray(self.state, dtype=np.float32)
             info = {}

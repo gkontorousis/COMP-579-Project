@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 import argparse
+import time
+import warnings
 import numpy as np
 import pandas as pd
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -12,6 +14,83 @@ from src.data_loader import build_daily_frames
 from src.registration import register_stock_envs
 from src import rl_algos
 from src.baseline_strategies import compute_portfolio_metrics
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# suppress noisy pandas warning from data split preprocessing
+warnings.filterwarnings(
+    "ignore",
+    message="Boolean Series key will be reindexed to match DataFrame index\\.",
+    category=UserWarning,
+)
+
+
+def log(message: str) -> None:
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] {message}", flush=True)
+
+
+def run_one_seed(task):
+    seed = int(task["seed"])
+    algo_name = task["algo"]
+    algo_cls = rl_algos.get_algo_class(algo_name)
+    cfg = RunConfig(algo_name=algo_name, seed=seed, model_out=Path(task["seed_model_out"]))
+    cfg.mkdir()
+
+    # Each subprocess must register envs in its own process space.
+    register_stock_envs(
+        data_path=task["dj_30_dp_path"],
+        dji_path=task["dji_path"],
+        init_balance=10_000,
+        max_shares_per_trade=5,
+    )
+
+    log(f"[seed={seed}] train start (timesteps={task['timesteps']})")
+    train_env = DummyVecEnv([lambda: gym.make("RLStockTrain-v0")])
+    rl_algos.train(
+        algo_cls,
+        train_env,
+        task["timesteps"],
+        seed,
+        cfg.model_out,
+        sigma=task["sigma"],
+        figure_out=cfg.train_figure_out,
+        **task["best_params"],
+    )
+    train_env.close()
+
+    log(f"[seed={seed}] trade start")
+    test_env = DummyVecEnv([lambda: gym.make("RLStockTest-v0")])
+    rl_algos.trade_online(
+        algo_cls,
+        cfg.model_out,
+        test_env,
+        cfg.online_model_out,
+        figure_out=cfg.test_figure_out,
+    )
+
+    inner = test_env.envs[0].unwrapped
+    metrics = {
+        "agent": compute_portfolio_metrics(np.array(inner.last_episode_asset_memory)),
+        "djia": compute_portfolio_metrics(inner.dji_growth),
+        "min_variance": compute_portfolio_metrics(inner.min_variance_growth),
+    }
+    test_env.close()
+
+    report = {
+        "run": {
+            "algo": cfg.algo_name,
+            "seed": seed,
+            "model_out": str(cfg.model_out),
+            "timesteps": task["timesteps"],
+            **({"n_episodes": task["n_episodes"]} if task["n_episodes"] is not None else {}),
+        },
+        "best_hyperparams": task["hyperparams"],
+        "metrics": metrics,
+    }
+    cfg.metrics_out.write_text(json.dumps(report, indent=2))
+    log(f"[seed={seed}] done; metrics={cfg.metrics_out}")
+    return {"seed": seed, "metrics": metrics}
 
 
 def _aggregate_metrics(per_seed: list[dict]) -> dict:
@@ -32,6 +111,7 @@ def _aggregate_metrics(per_seed: list[dict]) -> dict:
 
 
 def main():
+    run_start = time.time()
     parser = argparse.ArgumentParser(
         "RLStock full pipeline: tune → train → trade", allow_abbrev=False
     )
@@ -60,6 +140,12 @@ def main():
         help="Multiple seeds: tune once with seeds[0], train+trade per seed",
     )
     parser.add_argument(
+        "--seed_workers",
+        type=int,
+        default=None,
+        help="Max worker processes for multi-seed execution (default: number of seeds)",
+    )
+    parser.add_argument(
         "--model_out",
         type=Path,
         default=None,
@@ -76,6 +162,12 @@ def main():
         choices=rl_algos.SUPPORTED_ALGO_NAMES,
         help="Stable-Baselines3 off-policy actor-critic algorithm",
     )
+    parser.add_argument(
+        "--optuna_n_jobs",
+        type=int,
+        default=1,
+    )
+
     args = parser.parse_args()
     algo_cls = rl_algos.get_algo_class(args.algo)
     if args.model_out is None:
@@ -88,7 +180,7 @@ def main():
         n_train_days = len(build_daily_frames(pd.read_csv(args.dj_30_dp_path), mode="train"))
         timesteps = args.n_episodes * n_train_days
         timesteps_per_trial = timesteps
-        print(f"--n_episodes {args.n_episodes} × {n_train_days} train days = {timesteps} timesteps")
+        log(f"n_episodes={args.n_episodes} × train_days={n_train_days} -> timesteps={timesteps}")
     else:
         timesteps = args.timesteps if args.timesteps is not None else 10_000
         timesteps_per_trial = args.timesteps_per_trial
@@ -105,8 +197,8 @@ def main():
 
     # we only tune once with seeds[0] to find the best hyperparameters
     if args.n_trials > 0:
-        print(
-            f"Tuning over {args.n_trials} trials ({timesteps_per_trial} steps each) using seed {seeds[0]} ..."
+        log(
+            f"[tune] start trials={args.n_trials} timesteps_per_trial={timesteps_per_trial} seed={seeds[0]} optuna_n_jobs={args.optuna_n_jobs}"
         )
         best_params = rl_algos.tune(
             algo_cls,
@@ -115,72 +207,51 @@ def main():
             timesteps_per_trial,
             seeds[0],
             args.n_trials,
+            args.optuna_n_jobs,
         )
-        print("Best params:", best_params)
+        log(f"[tune] best_params={best_params}")
     else:
         best_params = {}
 
     sigma = best_params.pop("noise_sigma", 0.1)
     hyperparams = {**best_params, "noise_sigma": sigma}
 
-    per_seed_results = []
+    tasks = []
     for seed in seeds:
         if multi_seed:
             seed_model_out = args.model_out.parent / f"seed_{seed}" / args.model_out.name
         else:
             seed_model_out = args.model_out
-
-        cfg = RunConfig(algo_name=args.algo, seed=seed, model_out=seed_model_out)
-        cfg.mkdir()
-
-        print(f"\n[seed={seed}] Training for {timesteps} timesteps ...")
-        train_env = DummyVecEnv([lambda: gym.make("RLStockTrain-v0")])
-        rl_algos.train(
-            algo_cls,
-            train_env,
-            timesteps,
-            seed,
-            cfg.model_out,
-            sigma=sigma,
-            figure_out=cfg.train_figure_out,
-            **best_params,
-        )
-        train_env.close()
-
-        print(f"[seed={seed}] Trading (online learning on test episode) ...")
-        test_env = DummyVecEnv([lambda: gym.make("RLStockTest-v0")])
-        rl_algos.trade_online(
-            algo_cls,
-            cfg.model_out,
-            test_env,
-            cfg.online_model_out,
-            figure_out=cfg.test_figure_out,
-        )
-
-        inner = test_env.envs[0].unwrapped
-        metrics = {
-            "agent": compute_portfolio_metrics(np.array(inner.last_episode_asset_memory)),
-            "djia": compute_portfolio_metrics(inner.dji_growth),
-            "min_variance": compute_portfolio_metrics(inner.min_variance_growth),
-        }
-        test_env.close()
-
-        result = {"seed": seed, "metrics": metrics}
-        per_seed_results.append(result)
-
-        report = {
-            "run": {
-                "algo": cfg.algo_name,
+        tasks.append(
+            {
+                "algo": args.algo,
                 "seed": seed,
-                "model_out": str(cfg.model_out),
+                "seed_model_out": str(seed_model_out),
                 "timesteps": timesteps,
-                **({"n_episodes": args.n_episodes} if args.n_episodes is not None else {}),
-            },
-            "best_hyperparams": hyperparams,
-            "metrics": metrics,
-        }
-        cfg.metrics_out.write_text(json.dumps(report, indent=2))
-        print(f"[seed={seed}] Metrics JSON: {cfg.metrics_out}")
+                "n_episodes": args.n_episodes,
+                "sigma": sigma,
+                "best_params": best_params,
+                "hyperparams": hyperparams,
+                "dj_30_dp_path": str(args.dj_30_dp_path),
+                "dji_path": str(args.dji_path),
+            }
+        )
+
+    if multi_seed:
+        workers = args.seed_workers if args.seed_workers is not None else len(seeds)
+        workers = max(1, min(workers, len(seeds)))
+        log(f"[mp] start seeds={len(seeds)} workers={workers}")
+        per_seed_results = []
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(run_one_seed, task) for task in tasks]
+            done = 0
+            for f in as_completed(futures):
+                per_seed_results.append(f.result())
+                done += 1
+                log(f"[mp] completed {done}/{len(seeds)} seeds")
+        per_seed_results.sort(key=lambda x: x["seed"])
+    else:
+        per_seed_results = [run_one_seed(tasks[0])]
 
     if multi_seed:
         aggregate = {
@@ -196,13 +267,14 @@ def main():
         }
         agg_path = args.model_out.parent / "aggregate_metrics.json"
         agg_path.write_text(json.dumps(aggregate, indent=2))
-        print(f"\nAggregate metrics: {agg_path}")
+        log(f"[aggregate] wrote {agg_path}")
 
-    print("\n--- Summary ---")
-    print(f"  Algorithm : {args.algo.upper()}")
-    print(f"  Seeds     : {seeds}")
+    log("--- Summary ---")
+    log(f"Algorithm: {args.algo.upper()}")
+    log(f"Seeds: {seeds}")
     if args.n_trials > 0:
-        print(f"  Hyperparams (tuned with seed {seeds[0]}): {hyperparams}")
+        log(f"Hyperparams (tuned with seed {seeds[0]}): {hyperparams}")
+    log(f"Elapsed: {time.time() - run_start:.1f}s")
 
 
 # uv run python -m src.main \
@@ -213,5 +285,6 @@ def main():
 #   --n_episodes 50 \
 #   --n_trials 10 \
 #   --model_out outputs/ddpg_run1/ddpg_model
+#   --optuna_n_jobs -1
 if __name__ == "__main__":
     main()
