@@ -29,6 +29,23 @@ def compute_portfolio_metrics(values, freq=MHR_FREQ) -> dict:
     }
 
 
+def aggregate_metrics(per_seed: list[dict]) -> dict:
+    """Mean ± std for the agent (seed-dependent); single value for deterministic baselines."""
+    fields = list(per_seed[0]["metrics"]["agent"].keys())
+    agg = {"agent": {}}
+    for field in fields:
+        vals = [r["metrics"]["agent"][field] for r in per_seed]
+        agg["agent"][f"mean_{field}"] = round(float(np.mean(vals)), 6)
+        agg["agent"][f"std_{field}"] = round(
+            float(np.std(vals, ddof=1) if len(vals) > 1 else 0.0), 6
+        )
+
+    for strategy in ("djia", "min_variance"):
+        agg[strategy] = per_seed[0]["metrics"][strategy]
+
+    return agg
+
+
 def episode_dates_series(daily_data: list[Any]) -> pd.Series:
     """One YYYYMMDD int per `daily_data` row, in episode order (same as env trading days)."""
     return pd.Series([day_df["datadate"].iloc[0] for day_df in daily_data])

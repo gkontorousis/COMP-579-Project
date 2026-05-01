@@ -18,7 +18,7 @@ from src.registration import (
     register_stock_envs,
 )
 from src import rl_algos
-from src.baseline_strategies import compute_portfolio_metrics
+from src.baseline_strategies import aggregate_metrics, compute_portfolio_metrics
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -96,23 +96,6 @@ def run_one_seed(task):
     cfg.metrics_out.write_text(json.dumps(report, indent=2))
     log(f"[seed={seed}] done; metrics={cfg.metrics_out}")
     return {"seed": seed, "metrics": metrics}
-
-
-def _aggregate_metrics(per_seed: list[dict]) -> dict:
-    """Mean ± std for the agent (seed-dependent); single value for deterministic baselines."""
-    fields = list(per_seed[0]["metrics"]["agent"].keys())
-    agg = {"agent": {}}
-    for field in fields:
-        vals = [r["metrics"]["agent"][field] for r in per_seed]
-        agg["agent"][f"mean_{field}"] = round(float(np.mean(vals)), 6)
-        agg["agent"][f"std_{field}"] = round(
-            float(np.std(vals, ddof=1) if len(vals) > 1 else 0.0), 6
-        )
-
-    for strategy in ("djia", "min_variance"):
-        agg[strategy] = per_seed[0]["metrics"][strategy]
-
-    return agg
 
 
 def main():
@@ -268,7 +251,7 @@ def main():
             },
             "best_hyperparams": hyperparams,
             "per_seed": per_seed_results,
-            "aggregate": _aggregate_metrics(per_seed_results),
+            "aggregate": aggregate_metrics(per_seed_results),
         }
         agg_path = args.model_out.parent / "aggregate_metrics.json"
         agg_path.write_text(json.dumps(aggregate, indent=2))
