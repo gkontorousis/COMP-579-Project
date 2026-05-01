@@ -120,6 +120,7 @@ def tune(algo, train_env_id, val_env_id, timesteps_per_trial, seed, n_trials, n_
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         direction="maximize",
+        # optuna's TPESampler is a form of Bayesian optimization algorithm -- selected to have an intelligent hyperparameter searching
         sampler=optuna.samplers.TPESampler(seed=seed),
     )
     study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs)
