@@ -22,7 +22,7 @@ uv run python -m src.main \
   --n_episodes "$N_EPISODES" \
   --n_trials "$N_TRIALS" \
   --model_out outputs/ddpg_report/ddpg_model \
-  --optuna_n_jobs 3
+  --optuna_n_jobs 3 \
   > "$DDPG_LOG" 2>&1 &
 
 DDPG_PID=$!
@@ -37,7 +37,7 @@ uv run python -m src.main \
   --n_episodes "$N_EPISODES" \
   --n_trials "$N_TRIALS" \
   --model_out outputs/td3_report/td3_model \
-  --optuna_n_jobs 3
+  --optuna_n_jobs 3 \
   > "$TD3_LOG" 2>&1 &
 
 TD3_PID=$!
@@ -59,3 +59,6 @@ echo "  ps -p $TD3_PID"
 echo
 echo "Config:"
 echo "  seeds=${SEEDS[*]} seed_workers=$SEED_WORKERS threads_per_job=$THREADS_PER_JOB"
+
+echo "Caffeinating..."
+caffeinate $DDPG_PID $TD3_PID
