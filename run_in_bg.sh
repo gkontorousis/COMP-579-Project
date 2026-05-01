@@ -3,14 +3,16 @@ set -euo pipefail
 
 mkdir -p outputs/logs
 
-DDPG_LOG="outputs/logs/ddpg_report.log"
-TD3_LOG="outputs/logs/td3_report.log"
 SEEDS=(42 43 44)
 SEED_WORKERS=3
 N_EPISODES=50
 N_TRIALS=15
 # Keep BLAS/thread usage modest per top-level job since each job also spawns seed workers.
 THREADS_PER_JOB=2
+DDPG_LOG="outputs/logs/ddpg_report_${N_EPISODES}ep_${N_TRIALS}trials.log"
+TD3_LOG="outputs/logs/td3_report_${N_EPISODES}ep_${N_TRIALS}trials.log"
+DDPG_RUN_DIR="outputs/ddpg_report_${N_EPISODES}ep_${N_TRIALS}trials"
+TD3_RUN_DIR="outputs/td3_report_${N_EPISODES}ep_${N_TRIALS}trials"
 
 OMP_NUM_THREADS=$THREADS_PER_JOB VECLIB_MAXIMUM_THREADS=$THREADS_PER_JOB OPENBLAS_NUM_THREADS=$THREADS_PER_JOB NUMEXPR_NUM_THREADS=$THREADS_PER_JOB \
 uv run python -m src.main \
@@ -21,7 +23,7 @@ uv run python -m src.main \
   --seed_workers "$SEED_WORKERS" \
   --n_episodes "$N_EPISODES" \
   --n_trials "$N_TRIALS" \
-  --model_out outputs/ddpg_report/ddpg_model \
+  --model_out "${DDPG_RUN_DIR}/ddpg_model" \
   --optuna_n_jobs 3 \
   > "$DDPG_LOG" 2>&1 &
 
@@ -36,7 +38,7 @@ uv run python -m src.main \
   --seed_workers "$SEED_WORKERS" \
   --n_episodes "$N_EPISODES" \
   --n_trials "$N_TRIALS" \
-  --model_out outputs/td3_report/td3_model \
+  --model_out "${TD3_RUN_DIR}/td3_model" \
   --optuna_n_jobs 3 \
   > "$TD3_LOG" 2>&1 &
 
