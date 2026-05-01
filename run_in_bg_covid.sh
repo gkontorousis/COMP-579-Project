@@ -5,7 +5,7 @@ mkdir -p outputs/logs
 
 SEEDS=(42 43 44)
 SEED_WORKERS=3
-N_EPISODES=500
+N_EPISODES=30
 # Keep BLAS/thread usage modest per top-level job since each job also spawns seed workers.
 THREADS_PER_JOB=2
 

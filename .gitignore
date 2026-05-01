@@ -1,7 +1,6 @@
 *.DS_Store
 .venv/
 *.vscode/
-*.png
 *.pyc
 *__pycache__*
 outputs/
