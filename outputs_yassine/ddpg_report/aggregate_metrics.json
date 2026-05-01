@@ -1,0 +1,127 @@
+{
+  "run": {
+    "algo": "ddpg",
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "timesteps": 45300,
+    "n_episodes": 30
+  },
+  "best_hyperparams": {
+    "learning_rate": 0.0003632768071188918,
+    "batch_size": 256,
+    "gamma": 0.9533060450246198,
+    "tau": 0.005680191110882281,
+    "noise_sigma": 0.21499066370608327
+  },
+  "per_seed": [
+    {
+      "seed": 42,
+      "metrics": {
+        "agent": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 16419.26,
+          "annualized_return": 0.200121,
+          "annualized_std": 0.139194,
+          "sharpe_ratio": 1.437712
+        },
+        "djia": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 15594.8419,
+          "annualized_return": 0.177591,
+          "annualized_std": 0.117443,
+          "sharpe_ratio": 1.512147
+        },
+        "min_variance": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 13194.3984,
+          "annualized_return": 0.107361,
+          "annualized_std": 0.093659,
+          "sharpe_ratio": 1.146296
+        }
+      }
+    },
+    {
+      "seed": 43,
+      "metrics": {
+        "agent": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 15419.28,
+          "annualized_return": 0.172696,
+          "annualized_std": 0.122519,
+          "sharpe_ratio": 1.409545
+        },
+        "djia": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 15594.8419,
+          "annualized_return": 0.177591,
+          "annualized_std": 0.117443,
+          "sharpe_ratio": 1.512147
+        },
+        "min_variance": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 13194.3984,
+          "annualized_return": 0.107361,
+          "annualized_std": 0.093659,
+          "sharpe_ratio": 1.146296
+        }
+      }
+    },
+    {
+      "seed": 44,
+      "metrics": {
+        "agent": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 16585.86,
+          "annualized_return": 0.204586,
+          "annualized_std": 0.121567,
+          "sharpe_ratio": 1.682913
+        },
+        "djia": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 15594.8419,
+          "annualized_return": 0.177591,
+          "annualized_std": 0.117443,
+          "sharpe_ratio": 1.512147
+        },
+        "min_variance": {
+          "initial_portfolio_value": 10000.0,
+          "final_portfolio_value": 13194.3984,
+          "annualized_return": 0.107361,
+          "annualized_std": 0.093659,
+          "sharpe_ratio": 1.146296
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "agent": {
+      "mean_initial_portfolio_value": 10000.0,
+      "std_initial_portfolio_value": 0.0,
+      "mean_final_portfolio_value": 16141.466667,
+      "std_final_portfolio_value": 630.954892,
+      "mean_annualized_return": 0.192468,
+      "std_annualized_return": 0.017268,
+      "mean_annualized_std": 0.12776,
+      "std_annualized_std": 0.009914,
+      "mean_sharpe_ratio": 1.510057,
+      "std_sharpe_ratio": 0.150359
+    },
+    "djia": {
+      "initial_portfolio_value": 10000.0,
+      "final_portfolio_value": 15594.8419,
+      "annualized_return": 0.177591,
+      "annualized_std": 0.117443,
+      "sharpe_ratio": 1.512147
+    },
+    "min_variance": {
+      "initial_portfolio_value": 10000.0,
+      "final_portfolio_value": 13194.3984,
+      "annualized_return": 0.107361,
+      "annualized_std": 0.093659,
+      "sharpe_ratio": 1.146296
+    }
+  }
+}

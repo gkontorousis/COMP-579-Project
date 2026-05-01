@@ -1,0 +1,16 @@
+[2026-05-01 13:29:32] algo=td3 n_episodes=30 n_train_days=2515 timesteps=75450
+[2026-05-01 13:29:32] [mp] start seeds=3 workers=3
+[2026-05-01 13:29:34] [seed=42] train start (timesteps=75450)
+[2026-05-01 13:29:34] [seed=43] train start (timesteps=75450)
+[2026-05-01 13:29:34] [seed=44] train start (timesteps=75450)
+[2026-05-01 13:38:17] [seed=44] trade start
+[2026-05-01 13:38:17] [seed=42] trade start
+[2026-05-01 13:38:17] [seed=43] trade start
+[2026-05-01 13:38:18] [seed=44] done; metrics=outputs/covid_td3_report_30ep/seed_44/td3_covid_model_metrics.json
+[2026-05-01 13:38:18] [seed=42] done; metrics=outputs/covid_td3_report_30ep/seed_42/td3_covid_model_metrics.json
+[2026-05-01 13:38:18] [mp] completed 1/3 seeds
+[2026-05-01 13:38:18] [mp] completed 2/3 seeds
+[2026-05-01 13:38:19] [seed=43] done; metrics=outputs/covid_td3_report_30ep/seed_43/td3_covid_model_metrics.json
+[2026-05-01 13:38:19] [mp] completed 3/3 seeds
+[2026-05-01 13:38:19] [aggregate] wrote outputs/covid_td3_report_30ep/aggregate_metrics.json
+[2026-05-01 13:38:19] Elapsed: 527.5s
