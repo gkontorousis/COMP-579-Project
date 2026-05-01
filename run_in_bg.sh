@@ -59,6 +59,4 @@ echo "  ps -p $TD3_PID"
 echo
 echo "Config:"
 echo "  seeds=${SEEDS[*]} seed_workers=$SEED_WORKERS threads_per_job=$THREADS_PER_JOB"
-
-echo "Caffeinating..."
-caffeinate $DDPG_PID $TD3_PID
+wait $DDPG_PID $TD3_PID
