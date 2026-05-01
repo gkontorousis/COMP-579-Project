@@ -195,30 +195,21 @@ V_{t+1} = b_{t+1} + \sum_{i=1}^{28} p_{t+1}^{(i)} h_{t+1}^{(i)}.
 Thus, the agent is directly rewarded for increasing total portfolio value from one trading day to the next. This matches the reward structure used by Liu et al., where the goal is to learn a policy that maximizes cumulative portfolio growth over the trading horizon \cite{liu2018practical}.
 
 \paragraph{Episode Structure.}
-Each episode corresponds to one complete pass through a selected date split. The data are divided using the same periods as the original paper: training from 2009--2014, validation during 2015, and testing/trading from 2016 to 2018. The episode terminates when the environment reaches the final trading day of the current split.
+Each episode corresponds to one complete pass through a selected date split. The data are divided using the same periods as the original paper: training from 2009--2014, validation during 2015, and trading from 2016 to 2018. As in the original paper, the agent is allowed to continue updating its policy during the trading phase, making this an online trading evaluation rather than a purely fixed-policy test. The episode terminates when the environment reaches the final trading day of the current split.
 
 Overall, the environment can be summarized as a 28-asset, long-only, no-cost, daily rebalancing MDP. The state is composed of cash, current prices, and current holdings; the action is a bounded integer buy/sell vector; and the reward is the next-day change in mark-to-market portfolio value.
 
-\section{DDPG}
+\section{DDPG and TD3}
 
-Deep Deterministic Policy Gradient (DDPG) is an off-policy actor-critic algorithm designed for continuous action spaces \cite{lillicrap2015}. This makes it suitable for the trading environment, where the agent outputs one action value per stock before the environment converts these values into bounded buy, sell, or hold decisions. DDPG maintains two main neural networks: an actor and a critic. The actor $\mu(s|\theta^\mu)$ maps the current state $s_t$ to an action $a_t$, while the critic $Q(s,a|\theta^Q)$ estimates the expected return of taking action $a_t$ in state $s_t$.
+We evaluate two off-policy actor-critic methods for continuous control: DDPG \cite{lillicrap2015} and TD3 \cite{fujimoto2018}. In both methods, an actor maps the state to a continuous action and a critic estimates state-action value; replay buffers and target networks are used to stabilize training. This makes both algorithms suitable for our trading environment, where the policy outputs one value per stock before the environment converts actions into bounded integer buy/sell/hold decisions.
 
-% maybe either here or in implementation mention details about how we use a library for DDPG and TD3?
-To improve training stability, DDPG uses a replay buffer and target networks. The replay buffer stores past transitions $(s_t,a_t,r_t,s_{t+1})$, allowing the agent to train on randomly sampled mini-batches instead of highly correlated consecutive market observations. Target actor and critic networks are slowly updated versions of the main networks, and are used to compute more stable temporal-difference targets. Exploration is added by perturbing the actor's selected action with noise during training. A full DDPG training outline is included in Appendix~\ref{app:algorithms}. In this project, DDPG serves as the main reproduced algorithm because it is the method used in the original stock-trading paper \cite{liu2018practical}.
-
-\section{TD3}
-
-Twin Delayed Deep Deterministic Policy Gradient (TD3) is an extension of DDPG designed to reduce instability and overestimation bias in actor-critic learning \cite{fujimoto2018}. Like DDPG, TD3 uses an actor network to select continuous actions and critic networks to estimate state-action values. However, TD3 modifies the learning procedure in three important ways: it uses two critic networks, delays actor updates, and adds smoothing noise to target actions.
-
-The twin critics address overestimation bias by computing the target value using the smaller estimate from two critic networks. This makes the update more conservative and reduces the chance that the actor exploits overly optimistic value estimates. TD3 also updates the actor less frequently than the critics, allowing value estimates to improve before the policy is changed. Finally, target policy smoothing adds clipped noise to the next action, making the critic less sensitive to sharp or unreliable peaks in the learned value function. A full TD3 training outline is included in Appendix~\ref{app:algorithms}. We include TD3 as a stronger comparison to DDPG in the same trading environment, especially because stock-trading rewards can be noisy and sensitive to small policy changes.
+TD3 extends DDPG to improve stability by using twin critics (with a clipped double-Q target), delayed actor updates, and target policy smoothing. We include DDPG as the primary reproduced baseline from Liu et al.\ \cite{liu2018practical}, and TD3 as a stronger variant designed to reduce overestimation and noisy policy updates in this setting. Full algorithm outlines are provided in Appendix~\ref{app:algorithms}.
 
 \section{Implementation}
 
-The experiments were implemented using Stable-Baselines3 versions of DDPG and TD3 \citep{stable-baselines3}, with both algorithms run through the same training and evaluation pipeline. Each model used the reproduced stock-trading environment and was trained on daily price data for the Dow Jones constituent stocks over the selected training date range, with DJIA index prices provided separately for benchmark comparison.
+We used the Stable-Baselines3 implementations of DDPG and TD3 \citep{stable-baselines3}, running both algorithms through the same training and evaluation pipeline. Each model used the reproduced stock-trading environment and was trained on daily price data for the Dow Jones constituent stocks over the selected training date range.
 
-Hyperparameters were tuned with Optuna using 10 trials per algorithm. After tuning, each algorithm was trained for 30 episodes and evaluated across three random seeds, 42, 43, and 44. The seed runs were executed in parallel, and final results were aggregated by reporting the mean and standard deviation of the agent metrics across seeds.
-
-For consistency, DDPG and TD3 were launched with the same experimental settings: three seed workers, three Optuna jobs, and controlled CPU thread counts per job. The main difference between the two runs was the selected algorithm and the best hyperparameters found independently by Optuna.
+We performed Bayesian hyperparameter optimization with Optuna \citep{akiba2019optuna}, using 10 trials per algorithm. After selecting hyperparameters, each model was trained for 30 episodes and evaluated across three random seeds (42, 43, 44); results are reported as mean and standard deviation across seeds. Additional optimization details are provided in Appendix~\ref{app:hpo_details}.
 
 
 \section{Results and Discussion}
@@ -304,6 +295,14 @@ TD3 achieved the strongest performance in our experiments, outperforming DDPG in
     \caption{TD3 portfolio value over the trading period compared against DJIA and the min-variance baseline. (seed 42)}
     \label{fig:td3_results}
 \end{figure}
+
+\FloatBarrier
+
+\section{Hyperparameter Optimization Details}
+\label{app:hpo_details}
+\FloatBarrier
+
+This section will provide the full Optuna setup, including search spaces, objective definitions, and trial configuration details.
 
 \FloatBarrier
 
