@@ -37,15 +37,17 @@
 \end{frame}
 
 \begin{frame}{2) Environment and MDP}
-  \textbf{State (57-dim):}
+  \textbf{State:}
   \[
     s_t = [b_t,\; p_t^{(1..28)},\; h_t^{(1..28)}]
   \]
   where $b_t$ is cash, $p_t$ are prices, and $h_t$ are holdings.
 
   \vspace{0.5em}
-  \textbf{Action (28-dim):} integer trades per stock
+  \textbf{Action:} integer trades per stock
   \[
+    a_t = [a_t^{(1)}, \ldots, a_t^{(28)}],
+    \qquad
     a_t^{(i)} \in \{-5,-4,\ldots,0,\ldots,4,5\}
   \]
   with long-only and cash constraints.
@@ -74,9 +76,10 @@
   \end{itemize}
 
   \vspace{0.5em}
-  \textbf{Training protocol}
+  \textbf{Training and evaluation protocol}
   \begin{itemize}
     \item Stable-Baselines3 implementation.
+    \item Gymnasium for defining the custom stock trading environment
     \item Data split: train (2009--2014), validation (2015), test (2016--2018).
     \item Hyperparameter tuning with Optuna: 10 trials per algorithm.
     \item Final evaluation: 30 episodes, 3 seeds (42, 43, 44).
