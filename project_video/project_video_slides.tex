@@ -115,7 +115,29 @@
   \includegraphics[width=\linewidth,height=0.78\textheight,keepaspectratio]{resources/ddpg_model_test_s42.png}
 \end{frame}
 
-\begin{frame}{5) Interpretation, Limits, and Future Work}
+\begin{frame}{5) COVID-19 Stress Test (Robustness Check)}
+  \small
+  \textbf{Setup:} Train on 2010--2019, trade on volatile 2020 (COVID), same Dow Jones universe, best reproduced hyperparameters, 500 episodes, 3 seeds.
+
+  \vspace{0.4em}
+  \begin{tabular}{lcccc}
+    \toprule
+    Metric & DDPG & TD3 & Min-Var & DJIA \\
+    \midrule
+    Final Portfolio Value & \$10,590 & \$9,786 & \$10,477 & \$10,534 \\
+    Annualized Return & 5.93\% & -2.15\% & 4.79\% & 5.36\% \\
+    Sharpe Ratio & 0.18 & -0.04 & 0.20 & 0.15 \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.5em}
+  \begin{itemize}
+    \item RL does not consistently outperform DJIA and min-variance in this volatile regime.
+    \item This questions the original claim that DDPG outperforms classical baselines, since performance degrades under volatile market conditions.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{6) Interpretation, Limits, and Future Work}
   \textbf{What we reproduced}
   \begin{itemize}
     \item RL agents outperform min-variance baseline in this setting.
@@ -137,10 +159,10 @@
   % \textit{Speaker timing: ~45 seconds}
 \end{frame}
 
-\begin{frame}{6) Takeaways}
+\begin{frame}{7) Takeaways}
   \begin{itemize}
     \item The original DDPG stock-trading trend is \textbf{partially reproduced}.
-    \item \textbf{TD3 consistently outperforms DDPG} under the same setup.
+    \item \textbf{TD3 outperforms DDPG on the original split}, but not robustly across all regimes.
     \item Reinforcement learning can be promising for portfolio control, but
       realistic assumptions and robust evaluation are critical.
   \end{itemize}
