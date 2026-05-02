@@ -108,8 +108,9 @@
 %  - We also did an additional experiment to evaluate how the DDPG and TD3 algorithms do for a different date range and "trade" phase on COVID-19 crash (for year of 2020) which showed that both DDPG and TD3 did not outperform the DJIA which indicate that these RL algorithms are not best when needing to adapt to crashes (possibly cause we did not train on a crash period?)
 % also mention and change across the report actually that "TD3 showed higher mean performance than DDPG, albeit with increased variance, suggesting a potential advantage that requires further statistical confirmation."
 
+
 \begin{abstract}
-Stock trading strategy plays an important role in portfolio management, but finding an effective strategy is difficult in complex and dynamic financial markets. In this project, we reproduce a deep reinforcement learning approach for stock trading based on the formulation of Liu et al.\ \cite{liu2018practical}. We model the trading process as a finite-horizon Markov decision process, where the agent observes current cash, stock prices, and portfolio holdings, then learns buy, sell, and hold decisions that maximize portfolio value over time. Using the same historical Dow Jones data split as the original paper, we train and evaluate a DDPG agent and compare it against DJIA and a min-variance portfolio baseline. We also evaluate TD3, a more stable extension of DDPG. Our results show that reinforcement learning outperforms the min-variance baseline, and that TD3 achieves stronger performance than DDPG in both cumulative return and Sharpe ratio. This suggests that TD3's stability improvements are useful for stock-trading environments where value estimates and policy updates can be noisy.
+Stock trading is a challenging sequential decision-making problem because market dynamics are noisy and non-stationary. In this project, we reproduce the DDPG-based stock-trading formulation of \citet{liu2018practical}, where an agent observes cash, stock prices, and portfolio holdings, then learns buy, sell, and hold decisions to maximize portfolio value. Using the original Dow Jones data split, we compare DDPG and TD3 against DJIA and a min-variance portfolio allocation strategy as baselines. Both reinforcement learning agents outperform the min-variance baseline, while TD3 achieves the strongest final portfolio value and Sharpe ratio. We also run a COVID-19 stress test (train 2010--2019, trade 2020), where RL agents do not consistently outperform DJIA and min-variance, indicating sensitivity to volatile regime shifts.
 \end{abstract}
 
 \section{Background and Motivation}
@@ -131,10 +132,16 @@ Rather than proposing a new trading algorithm, this work focuses on practical re
 
 \section{MDP Formulation and State Space}
 
-Following Liu et al.\ \cite{liu2018practical}, we model the stock-trading problem as a finite-horizon Markov decision process (MDP). At each trading day, the agent observes the current portfolio state, chooses a trading action for each stock, corresponding to the number of shares to buy or sell, and receives a reward based on the resulting change in portfolio value. In our implementation, the MDP is deterministic with respect to the fixed historical price series: once the dataset split and the agent's action are fixed, the next state is fully determined. A schematic of this trading loop is provided in Appendix~\ref{app:mdp_diagram}.
+Following \cite{liu2018practical}, we model stock trading as a finite-horizon Markov decision process. At each trading day, the agent observes the current portfolio, chooses buy/sell/hold actions for each stock, and receives a reward equal to the change in total portfolio value. Since the environment uses a fixed historical price series, the transition is deterministic once the dataset split and action are fixed.
 
-\paragraph{State Space.}
-The observed state is a continuous vector containing the agent's cash balance, the current adjusted close prices of all selected stocks, and the number of shares currently held in each stock. Although the original paper describes the Dow Jones 30 setting, our filtered dataset contains 28 tradable stocks. Therefore, the observation vector has length 57:
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{resources/markov.png}
+    \caption{Stock-trading MDP used in our reproduction. The agent observes cash, current prices, and current holdings, then selects bounded buy/sell actions. The environment executes trades, advances to the next trading day, and returns the change in portfolio value as the reward.}
+    \label{fig:mdp_trading}
+\end{figure}
+
+The state contains cash, adjusted close prices, and holdings. Although the original paper refers to the Dow Jones 30 setting, our filtered dataset contains 28 tradable stocks, giving an observation vector of length 57:
 \[
 s_t =
 \left[
@@ -143,85 +150,57 @@ p_t^{(1)}, \ldots, p_t^{(28)},
 h_t^{(1)}, \ldots, h_t^{(28)}
 \right],
 \]
-where $b_t$ is the available cash balance, $p_t^{(i)}$ is the adjusted close price of stock $i$ on day $t$, and $h_t^{(i)}$ is the number of shares held for stock $i$. Equivalently, index 0 stores cash, indices 1--28 store prices, and indices 29--56 store holdings.
+where $b_t$ is cash, $p_t^{(i)}$ is the adjusted close price of stock $i$, and $h_t^{(i)}$ is the number of shares held. Each episode starts with \$10{,}000 in cash and zero holdings.
 
-At the beginning of each episode, the environment is reset with an initial cash balance of \$10{,}000, the adjusted close prices from the first day of the selected split, and zero holdings for all stocks:
-\[
-b_0 = 10000, 
-\qquad
-h_0^{(i)} = 0 \quad \forall i.
-\]
-The observation space is represented as a nonnegative continuous box, since cash, prices, and holdings are all constrained to be nonnegative.
-
-% too detailed specifications (mentioning indices etc); could move the more specific details into an appendix section
-\paragraph{Action Space.}
-The action is a 28-dimensional vector, with one trade signal per stock:
+The action is a 28-dimensional trade vector,
 \[
 a_t =
 \left[
 a_t^{(1)}, \ldots, a_t^{(28)}
-\right].
+\right],
 \]
-The declared action space is continuous with bounds $[-5,5]$ for each stock. However, before execution, each action is clipped, rounded, and cast to an integer. Thus, the effective action for each stock is
+with one action per stock. Actions are clipped, rounded, and executed as integers in
 \[
 a_t^{(i)} \in \{-5,-4,\ldots,0,\ldots,4,5\}.
 \]
-A negative value means selling shares, a positive value means buying shares, and zero means holding the current position:
-\[
-a_t^{(i)} < 0 \Rightarrow \text{sell}, 
-\qquad
-a_t^{(i)} > 0 \Rightarrow \text{buy},
-\qquad
-a_t^{(i)} = 0 \Rightarrow \text{hold}.
-\]
+Negative values sell shares, positive values buy shares, and zero holds the position. The environment is long-only: holdings cannot become negative, and buy orders are limited by available cash. We do not model transaction costs, slippage, taxes, or borrowing.
 
-The trading constraints are long-only. The agent cannot short-sell, so holdings are never allowed to become negative. Similarly, buy orders are limited by the available cash balance, meaning the agent can only purchase shares it can afford at the current day's prices. The environment does not include transaction costs, slippage, taxes, or borrowing.
-
-\paragraph{Transition Dynamics and Reward.}
-At each time step, the environment first computes the portfolio value before trading:
+The portfolio value is
 \[
 V_t = b_t + \sum_{i=1}^{28} p_t^{(i)} h_t^{(i)}.
 \]
-It then applies the agent's sell and buy actions using the current day's adjusted close prices. After trades are executed, the environment advances to the next trading day. Cash and holdings are carried forward after the trade execution, while the price vector is replaced by the next day's prices.
-
-The reward is the change in total mark-to-market portfolio value:
+After the agent acts, the environment executes trades at the current day's prices, advances to the next trading day, and computes the reward as
 \[
-r_t = V_{t+1} - V_t,
+r_t = V_{t+1} - V_t.
 \]
-where
-\[
-V_{t+1} = b_{t+1} + \sum_{i=1}^{28} p_{t+1}^{(i)} h_{t+1}^{(i)}.
-\]
-Thus, the agent is directly rewarded for increasing total portfolio value from one trading day to the next. This matches the reward structure used by Liu et al., where the goal is to learn a policy that maximizes cumulative portfolio growth over the trading horizon \cite{liu2018practical}.
 
-\paragraph{Episode Structure.}
-Each episode corresponds to one complete pass through a selected date split. The data are divided using the same periods as the original paper: training from 2009--2014, validation during 2015, and trading from 2016 to 2018. As in the original paper, the agent is allowed to continue updating its policy during the trading phase, making this an online trading evaluation rather than a purely fixed-policy test. The episode terminates when the environment reaches the final trading day of the current split.
-
-Overall, the environment can be summarized as a 28-asset, long-only, no-cost, daily rebalancing MDP. The state is composed of cash, current prices, and current holdings; the action is a bounded integer buy/sell vector; and the reward is the next-day change in mark-to-market portfolio value.
+Thus, the agent is directly rewarded for increasing mark-to-market portfolio value. Each episode is one pass through a data split: training (2009--2014), validation (2015), or testing (2016--2018), which is also referred to as 'trading'. As in the original paper, policy updates continue during trading, so this is an online evaluation rather than a fixed-policy test. The episode ends at the final trading day of the given split.
 
 \section{DDPG and TD3}
 
 We evaluate two off-policy actor-critic methods for continuous control: DDPG \cite{lillicrap2015} and TD3 \cite{fujimoto2018}. In both methods, an actor maps the state to a continuous action and a critic estimates state-action value; replay buffers and target networks are used to stabilize training. This makes both algorithms suitable for our trading environment, where the policy outputs one value per stock before the environment converts actions into bounded integer buy/sell/hold decisions.
 
-TD3 extends DDPG to improve stability by using twin critics (with a clipped double-Q target), delayed actor updates, and target policy smoothing. We include DDPG as the primary reproduced baseline from Liu et al.\ \cite{liu2018practical}, and TD3 as a stronger variant designed to reduce overestimation and noisy policy updates in this setting. Full algorithm outlines are provided in Appendix~\ref{app:algorithms}.
+TD3 extends DDPG to improve stability by using twin critics (with a clipped double-Q target), delayed actor updates, and target policy smoothing. We include DDPG as the primary reproduced baseline from Liu et al.\ \cite{liu2018practical}, and TD3 as a stronger variant designed to reduce overestimation and noisy policy updates in this setting. Since DDPG and TD3 are well known algorithms, our discussion here is an overview of them; full algorithm outlines are provided in Appendix~\ref{app:algorithms}.
 
 \section{Implementation}
 
-We used the Stable-Baselines3 implementations of DDPG and TD3 \citep{stable-baselines3}, running both algorithms through the same training and evaluation pipeline. Each model used the reproduced stock-trading environment and was trained on daily price data for the Dow Jones constituent stocks over the selected training date range.
+We used the Stable-Baselines3 implementations of DDPG and TD3 \citep{stable-baselines3}, running both algorithms through the same training and evaluation pipeline. For both models, we reconstructed the original stock-trading task as a custom Gymnasium environment \citep{gymnasium}, using daily Yahoo Finance market data fetched with yfinance \citep{yfinance} for the Dow Jones constituent stocks over the selected training date range.
 
-We performed Bayesian hyperparameter optimization with Optuna \citep{akiba2019optuna}, using 10 trials per algorithm. After selecting hyperparameters, each model was trained for 30 episodes and evaluated across three random seeds (42, 43, 44); results are reported as mean and standard deviation across seeds. Additional optimization details are provided in Appendix~\ref{app:hpo_details}.
+We performed Bayesian hyperparameter optimization with Optuna \citep{akiba2019optuna}, using 10 trials per algorithm. After selecting hyperparameters, each model was trained for 30 episodes and evaluated across three random seeds; results are reported as mean and standard deviation across seeds. Additional details about the hyperparameter tuning are provided in Appendix~\ref{app:hpo_details}.
+
+%% may need to add more implementation details in main report?
 
 
 \section{Results and Discussion}
 
-Table~\ref{tab:trading_results} summarizes the final test-period performance of DDPG, TD3, the min-variance baseline, and DJIA. Each reinforcement learning result is reported as the mean across three random seeds, with standard deviations shown in parentheses. Both RL agents outperformed the min-variance portfolio in final portfolio value and annualized return. DDPG slightly outperformed DJIA in return, but its mean Sharpe ratio was approximately equal to DJIA, suggesting that its higher return came with slightly higher risk. TD3 produced the strongest overall result, achieving the highest final portfolio value, annualized return, and Sharpe ratio.
+Table~\ref{tab:trading_results} summarizes the final test-period performance of DDPG, TD3, the min-variance baseline, and the DJIA. Each reinforcement learning result is reported as the mean across three random seeds, with standard deviations shown in parentheses. Both RL agents outperformed the min-variance portfolio in final portfolio value and annualized return. DDPG slightly outperformed DJIA in annualized return while matching DJIA's Sharpe ratio. TD3 produced the strongest overall result, achieving the highest final portfolio value, annualized return, and Sharpe ratio; this higher Sharpe indicates better risk-adjusted performance. Representative portfolio-value curves from a specific seed are included in Appendix~\ref{app:portfolio_plots}; these show the same qualitative trend, with both learned agents tracking above the min-variance portfolio strategy baseline and TD3 ending above DDPG.
 
 
-\begin{table*}[t]
+\begin{table}[H]
 \centering
 \caption{Trading performance on the 2016--2018 test period. RL results are reported as mean across seeds, with standard deviation in parentheses.}
 \label{tab:trading_results}
-\resizebox{\textwidth}{!}{
+\resizebox{\columnwidth}{!}{
 \begin{tabular}{lcccc}
 \toprule
 Metric & DDPG & TD3 & Min-Variance & DJIA \\
@@ -234,21 +213,41 @@ Sharpe Ratio & 1.51 $(0.15)$ & 1.68 $(0.20)$ & 1.15 & 1.51 \\
 \bottomrule
 \end{tabular}
 }
-\end{table*}
+\end{table}
 
-The results partially reproduce the trend reported by Liu et al.\ \cite{liu2018practical}: reinforcement learning can outperform the classical min-variance baseline in this trading environment. However, our reproduced DDPG result is weaker than the original paper's reported DDPG performance. In our runs, DDPG achieved a mean final portfolio value of \$16{,}141.47, while the original paper reported \$19{,}791. This gap is likely due in part to computational limitations: our models were trained for a relatively limited number of episodes and Optuna trials, while the original paper does not fully specify the hyperparameter search process or training budget used to obtain its final result. As a result, our reproduction may not have matched the amount of tuning or training needed to reach the strongest DDPG policy. DDPG also only matched DJIA on Sharpe ratio, rather than clearly exceeding it.
+The main split partially reproduces Liu et al.\ \cite{liu2018practical}: both RL agents outperform the min-variance baseline, and TD3 is strongest overall. However, our DDPG result (\$16{,}141.47 final value) remains below the original reported value (\$19{,}791), likely because our training and hyperparameter search budget is smaller and the original tuning procedure is not fully specified.
 
-TD3 performed better than DDPG under the same experimental setup. Its mean final portfolio value was \$16{,}918.53 compared to DDPG's \$16{,}141.47, and its mean Sharpe ratio was 1.68 compared to DDPG's 1.51. This is consistent with the design motivation behind TD3: DDPG can be sensitive to noisy or overestimated critic values, which may lead the actor toward unstable trading decisions. TD3 reduces this issue by using two critics and taking the smaller target value, delaying policy updates, and smoothing target actions \cite{fujimoto2018}.
+TD3 improves over DDPG in mean final portfolio value (\$16{,}918.53 vs.\ \$16{,}141.47) and mean Sharpe ratio (1.68 vs.\ 1.51), consistent with its stabilizing design (twin critics, delayed policy updates, and target smoothing) \cite{fujimoto2018}. However, given the reported standard deviations (e.g., \$1002.53 vs.\ \$630.95 in final value), this advantage may be moderate rather than large. In this environment, where continuous actions are rounded into integer trades and rewards depend on noisy daily portfolio changes, these stabilizing changes likely helped TD3 produce better risk-adjusted returns on average. More broadly, the results suggest that future work should focus not only on more complex models, but also on more realistic and robust evaluation, including longer training budgets, broader hyperparameter searches, transaction costs, slippage, and evaluation across additional market periods.
 
-More broadly, the stronger TD3 result suggests that stability may matter more than raw algorithmic flexibility in this trading environment. The action space is continuous before being rounded into integer trades, and the reward signal depends on noisy daily portfolio changes. In this setting, small errors in the critic can push the actor toward trades that appear profitable under the learned value function but do not generalize well over the test period. Since DDPG relies on a single critic, it is more exposed to this kind of overestimation error. TD3's clipped double-Q update makes the target value more conservative, while delayed policy updates give the critics more time to improve before the actor is changed. This likely helped TD3 avoid some unstable policy updates and produce better risk-adjusted returns.
+We also ran an additional stress test using the best hyperparameters from the main reproduction, training for 500 episodes on 2010--2019 and trading on the volatile 2020 COVID period (same Dow Jones stock universe; setup details in Appendix~\ref{app:covid_setup}). In this regime, RL did not consistently outperform classical baselines: TD3 underperformed both DJIA and min-variance (final value \$9{,}785.69, Sharpe -0.04), while DDPG had only a small mean final-value edge (\$10{,}590.07 vs.\ DJIA \$10{,}533.71 and min-variance \$10{,}476.71) but high seed variance and weaker risk-adjusted performance than min-variance. This highlights sensitivity to regime shifts and questions the robustness of the original effectiveness claim under highly volatile markets.
 
-These results also suggest a direction for future work. Rather than only increasing model complexity, future experiments should focus on improving the realism and robustness of the trading setup. This includes longer training budgets, broader hyperparameter searches, transaction costs, slippage, larger stock universes, and evaluation on additional market periods. It would also be useful to compare TD3 against other modern off-policy methods such as Soft Actor-Critic, and to test whether the advantage of TD3 remains when the environment includes more realistic trading frictions.
+\begin{table}[H]
+\centering
+\caption{COVID-19 stress-test performance on the 2020 trading period. RL results are mean across seeds, with standard deviation in parentheses.}
+\label{tab:covid_results}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+Metric & DDPG & TD3 & Min-Variance & DJIA \\
+\midrule
+Initial Portfolio Value & \$10{,}000 & \$10{,}000 & \$10{,}000 & \$10{,}000 \\
+Final Portfolio Value & \$10{,}590.07 $(1261.53)$ & \$9{,}785.69 $(305.36)$ & \$10{,}476.71 & \$10{,}533.71 \\
+Annualized Return & 5.93\% $(12.67)$ & -2.15\% $(3.07)$ & 4.79\% & 5.36\% \\
+Annualized Std. & 40.87\% $(6.30)$ & 43.86\% $(6.03)$ & 23.87\% & 36.88\% \\
+Sharpe Ratio & 0.18 $(0.32)$ & -0.04 $(0.07)$ & 0.20 & 0.15 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
 
 \section{Conclusion}
 
-We reproduced the stock-trading reinforcement learning setup of Liu et al.\ \cite{liu2018practical} using the same MDP formulation and historical Dow Jones data split. Our DDPG results followed the main trend of the original paper by outperforming the min-variance baseline, though they were weaker than the reported original results, likely due to a smaller training and hyperparameter-tuning budget and uncertainty around the original tuning procedure.
+We reproduced the stock-trading reinforcement learning setup of \cite{liu2018practical} using the same MDP formulation and historical Dow Jones data split. Our DDPG results followed the main trend of the original paper by outperforming the min-variance baseline, though they were weaker than the reported original results, likely due to a smaller training and hyperparameter-tuning budget and uncertainty around the original tuning procedure.
 
-TD3 achieved the strongest performance in our experiments, outperforming DDPG in final portfolio value, annualized return, and Sharpe ratio. Overall, these results suggest that while DDPG can learn useful trading behavior in this environment, TD3 provides a more stable and effective alternative for this reproduced stock-trading task.
+TD3 achieved the strongest performance in our experiments, outperforming DDPG in final portfolio value, annualized return, and Sharpe ratio. However, in an additional COVID-19 stress test on the volatile 2020 market, RL agents did not consistently outperform DJIA and min-variance baselines. Overall, these results suggest that while DDPG can learn useful trading behavior in this environment, TD3 provides a more stable and effective alternative for this reproduced stock-trading task, but robustness remains sensitive to market regime shifts.
+
+\section*{Contributions and Acknowledgements}
+Both authors contributed equally to the implementation, experiments, analysis, and writing. We thank the authors of the original stock-trading DDPG repository and the developers of Stable-Baselines3, Gymnasium, yfinance and Optuna for the tools used in this project.
 
 
 % In the unusual situation where you want a paper to appear in the
@@ -264,19 +263,6 @@ TD3 achieved the strongest performance in our experiments, outperforming DDPG in
 \newpage
 \appendix
 % \onecolumn
-
-\section{MDP Diagram}
-\label{app:mdp_diagram}
-\FloatBarrier
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.95\linewidth]{resources/markov.png}
-    \caption{Stock-trading MDP used in our reproduction. The agent observes cash, current prices, and current holdings, then selects bounded buy/sell actions. The environment executes trades, advances to the next trading day, and returns the change in portfolio value as the reward.}
-    \label{fig:mdp_trading}
-\end{figure}
-
-\FloatBarrier
 
 \section{Portfolio Value Plots}
 \label{app:portfolio_plots}
@@ -298,11 +284,25 @@ TD3 achieved the strongest performance in our experiments, outperforming DDPG in
 
 \FloatBarrier
 
+\section{COVID-19 Stress-Test Setup and Results}
+\label{app:covid_setup}
+\FloatBarrier
+
+We implemented the stress test in a similar pipeline as the main reproduction experiment. For each algorithm, we reused the best hyperparameters from the main reproduction (no re-tuning), then trained on 2010--2019 daily Dow Jones data and traded online on the 2020 COVID period, using the same Dow Jones universe, \$10{,}000 initial balance, and max 5 shares per trade (per ticker/stock). We evaluated three seeds (42, 43, 44), corresponding to 500 episodes (1{,}257{,}500 timesteps), and report mean and standard deviation across seeds for RL agents.
+
+\FloatBarrier
+
 \section{Hyperparameter Optimization Details}
 \label{app:hpo_details}
 \FloatBarrier
 
-This section will provide the full Optuna setup, including search spaces, objective definitions, and trial configuration details.
+We tuned both DDPG and TD3 with Optuna over the same search ranges used in the implementation: learning rate in $[10^{-4}, 10^{-3}]$, batch size in $\{64,128,256\}$, discount factor $\gamma$ in $[0.95,0.999]$, soft-update rate $\tau$ in $[0.001,0.01]$, and exploration-noise scale $\sigma$ in $[0.05,0.3]$. For trial selection, we used Optuna's TPE sampler (\texttt{TPESampler}), which is a Bayesian hyperparameter optimization method.
+
+Best hyperparameters from the 30-episode/10-trial main reproduction runs were:
+\begin{itemize}
+    \item \textbf{DDPG:} learning rate $= 3.6328 \times 10^{-4}$, batch size $=256$, $\gamma = 0.9533$, $\tau = 0.00568$, noise $\sigma = 0.21499$.
+    \item \textbf{TD3:} learning rate $= 2.3150 \times 10^{-4}$, batch size $=64$, $\gamma = 0.96165$, $\tau = 0.00537$, noise $\sigma = 0.29054$.
+\end{itemize}
 
 \FloatBarrier
 
