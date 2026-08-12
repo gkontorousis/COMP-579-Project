@@ -4,7 +4,7 @@ Reference upstream project: [AI4Finance-Foundation/Deep-Reinforcement-Learning-f
 
 This is the repository for our COMP-579 final course project.
 
-We chose to reproduce a [paper](pdfs/reference_papers/Liu - Practical Deep Reinforcement Learning Approach for Stock Trading.pdf) which applies reinforcement learning to stock trading and compares its performance to min-variance portfolio allocation strategy and the Dow Jones Industrial Average (DJIA).
+We chose to reproduce the paper [Practical Deep Reinforcement Learning Approach for Stock Trading](https://arxiv.org/abs/1811.07522) which applies reinforcement learning to stock trading and compares its performance to min-variance portfolio allocation strategy and the Dow Jones Industrial Average (DJIA).
 
 ### Repository layout
 The repository is organized as follows:
